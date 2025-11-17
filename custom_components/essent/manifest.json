@@ -1,9 +1,9 @@
 {
   "domain": "essent",
-  "name": "Essent",
-  "codeowners": ["@jwpieroen"],
+  "name": "Essent Dynamic Prices",
+  "codeowners": ["@jaapp"],
   "config_flow": true,
-  "documentation": "https://github.com/jwpieroen/essent-ha-integration",
+  "documentation": "https://github.com/jaapp/ha-essent-dynamic",
   "iot_class": "cloud_polling",
   "requirements": [],
   "version": "1.0.0"

@@ -2,12 +2,12 @@
   "config": {
     "step": {
       "user": {
-        "title": "Essent Dynamic Energy Prices",
-        "description": "Set up Essent energy price monitoring for the Netherlands."
+        "title": "Essent Dynamic Prices",
+        "description": "Set up Essent dynamic energy price monitoring for the Netherlands. For customers with dynamic pricing contracts only."
       }
     },
     "abort": {
-      "already_configured": "Essent integration is already configured"
+      "already_configured": "Essent Dynamic Prices integration is already configured"
     }
   },
   "entity": {
