@@ -10,7 +10,7 @@ from homeassistant.helpers.event import async_track_point_in_utc_time
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .const import API_ENDPOINT, DOMAIN, UPDATE_INTERVAL
+from .const import API_ENDPOINT, API_FETCH_OFFSET_SECONDS, DOMAIN, UPDATE_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,25 +45,23 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
             self._unsub_listener = None
 
     def _schedule_data_refresh(self) -> None:
-        """Schedule next data fetch aligned to the top of the hour (hourly API calls)."""
+        """Schedule next data fetch aligned near the top of the hour with a slight offset."""
         if self._unsub_data:
             self._unsub_data()
 
         now = dt_util.utcnow()
-        next_hour = now + timedelta(hours=1)
-        next_run = datetime(
-            next_hour.year,
-            next_hour.month,
-            next_hour.day,
-            next_hour.hour,
-            tzinfo=dt_util.UTC,
+        current_hour = now.replace(minute=0, second=0, microsecond=0)
+        candidate = current_hour + timedelta(
+            hours=1, seconds=API_FETCH_OFFSET_SECONDS
         )
+        if candidate <= now:
+            candidate = candidate + timedelta(hours=1)
 
         def _handle(_: datetime) -> None:
             self._unsub_data = None
             self.hass.async_create_task(self.async_request_refresh())
 
-        self._unsub_data = async_track_point_in_utc_time(self.hass, _handle, next_run)
+        self._unsub_data = async_track_point_in_utc_time(self.hass, _handle, candidate)
 
     def _schedule_listener_tick(self) -> None:
         """Schedule listener updates on the hour to advance cached tariffs."""
