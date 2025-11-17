@@ -1,0 +1,7 @@
+{
+  "name": "Essent",
+  "content_in_root": false,
+  "filename": "essent",
+  "render_readme": true,
+  "homeassistant": "2024.1.0"
+}
