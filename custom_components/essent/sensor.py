@@ -270,8 +270,10 @@ class EssentAveragePriceSensor(EssentEntity, SensorEntity):
         """Initialize the sensor."""
         super().__init__(coordinator, energy_type)
         self._attr_unique_id = f"essent_{energy_type}_average_today"
-        energy_name = "Electricity" if energy_type == "electricity" else "Gas"
-        self._attr_name = f"{energy_name} Average Today"
+        if energy_type == ENERGY_TYPE_GAS:
+            self._attr_name = "Gas Price Today"
+        else:
+            self._attr_name = "Electricity Average Today"
         self.entity_id = f"sensor.essent_{energy_type}_average_today"
 
     @property
