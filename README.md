@@ -17,7 +17,21 @@ Home Assistant integration for Essent dynamic energy contract prices in the Neth
 
 ## Installation
 
-See [Installation Guide](docs/INSTALLATION.md)
+### Via HACS (Recommended)
+
+1. Click this button:
+
+[![Open this repository in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=jaapp&repository=ha-essent-dynamic&category=integration)
+
+Or manually:
+
+1. Open **HACS → Integrations → Custom repositories**
+2. Add `https://github.com/jaapp/ha-essent-dynamic` as an *Integration*
+3. Install **Essent Dynamic Prices** and restart Home Assistant
+
+### Manual Installation
+
+See [Installation Guide](docs/INSTALLATION.md) for manual installation instructions.
 
 ## Energy Dashboard Setup
 
