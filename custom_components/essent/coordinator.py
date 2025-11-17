@@ -1,5 +1,5 @@
 """DataUpdateCoordinator for Essent integration."""
-from datetime import timedelta
+from datetime import datetime, timedelta
 import logging
 from typing import Any
 
@@ -8,6 +8,7 @@ import aiohttp
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
+from homeassistant.helpers.event import async_call_later
 
 from .const import API_ENDPOINT, DOMAIN, UPDATE_INTERVAL
 
@@ -30,6 +31,7 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
             name=DOMAIN,
             update_interval=timedelta(seconds=UPDATE_INTERVAL),
         )
+        self._unsub_boundary: Callable[[], None] | None = None
 
     def _normalize_energy_block(
         self,
@@ -79,6 +81,43 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
             "avg_price": sum(amounts) / len(amounts),
             "max_price": max(amounts),
         }
+
+    def _set_next_refresh(self, result: dict[str, Any]) -> None:
+        """Schedule listener updates at tariff boundaries using cached data."""
+        if self._unsub_boundary:
+            self._unsub_boundary()
+
+        now = dt_util.as_local(dt_util.utcnow())
+        next_start: datetime | None = None
+
+        for energy_data in result.values():
+            for tariff in energy_data.get("tariffs", []) + energy_data.get(
+                "tariffs_tomorrow", []
+            ):
+                start = dt_util.parse_datetime(tariff.get("startDateTime"))
+                if not start:
+                    continue
+                if start.tzinfo is None:
+                    start = dt_util.as_local(start)
+                if start > now and (next_start is None or start < next_start):
+                    next_start = start
+
+        if not next_start:
+            return
+
+        delay = max(30, int((next_start - now).total_seconds()) + 1)
+
+        def _handle_boundary(_: datetime) -> None:
+            self._unsub_boundary = None
+            self.async_update_listeners()
+            if self.data:
+                self._set_next_refresh(self.data)
+
+        self._unsub_boundary = async_call_later(
+            self.hass,
+            delay,
+            _handle_boundary,
+        )
 
     async def _async_update_data(self) -> dict:
         """Fetch data from API."""
@@ -139,7 +178,7 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
                 )
                 raise UpdateFailed("Response missing electricity or gas data")
 
-            return {
+            result = {
                 "electricity": self._normalize_energy_block(
                     electricity_block,
                     "electricity",
@@ -151,6 +190,8 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
                     tomorrow.get("gas") if tomorrow else None,
                 ),
             }
+            self._set_next_refresh(result)
+            return result
         except aiohttp.ClientError as err:
             raise UpdateFailed(f"Error communicating with API: {err}") from err
         except KeyError as err:

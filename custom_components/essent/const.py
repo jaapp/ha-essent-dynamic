@@ -2,7 +2,7 @@
 
 DOMAIN = "essent"
 API_ENDPOINT = "https://www.essent.nl/api/public/tariffmanagement/dynamic-prices/v1/"
-UPDATE_INTERVAL = 3600  # 1 hour in seconds
+UPDATE_INTERVAL = 21600  # 6 hours in seconds (API fetch), sensors tick hourly from cached data
 ATTRIBUTION = "Data provided by Essent"
 
 # Energy types
