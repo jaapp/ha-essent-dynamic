@@ -5,6 +5,7 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+from homeassistant.util import dt as dt_util
 
 from custom_components.essent.const import DOMAIN
 
@@ -16,7 +17,12 @@ async def test_full_integration_setup(
 ) -> None:
     """Test complete integration setup."""
     # Mock API response
-    with patch("aiohttp.ClientSession.get") as mock_get:
+    with patch("aiohttp.ClientSession.get") as mock_get, patch(
+        "homeassistant.util.dt.now"
+    ) as mock_now:
+        mock_now.return_value = dt_util.as_local(
+            dt_util.parse_datetime("2025-11-16T12:00:00")
+        )
         mock_response = AsyncMock()
         mock_response.status = 200
         mock_response.json = AsyncMock(return_value=essent_api_response)

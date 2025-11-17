@@ -7,6 +7,7 @@ import aiohttp
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .const import API_ENDPOINT, DOMAIN, UPDATE_INTERVAL
 
@@ -101,9 +102,7 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
                     try:
                         data = await response.json()
                     except Exception as err:
-                        _LOGGER.debug(
-                            "Failed to decode JSON body: %s", raw_body
-                        )
+                        _LOGGER.debug("Failed to decode JSON body: %s", raw_body)
                         raise UpdateFailed(f"Invalid JSON received: {err}") from err
 
             prices = data.get("prices") or []
@@ -111,8 +110,26 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
                 _LOGGER.debug("No price data available in response: %s", data)
                 raise UpdateFailed("No price data available")
 
-            today = prices[0]
-            tomorrow = prices[1] if len(prices) > 1 else None
+            current_date = dt_util.now().date().isoformat()
+            today = None
+            tomorrow = None
+
+            for idx, price in enumerate(prices):
+                if price.get("date") == current_date:
+                    today = price
+                    if idx + 1 < len(prices):
+                        tomorrow = prices[idx + 1]
+                    break
+
+            if today is None:
+                today = prices[0]
+                tomorrow = prices[1] if len(prices) > 1 else None
+                _LOGGER.debug(
+                    "No price entry found for %s, falling back to first date %s",
+                    current_date,
+                    today.get("date"),
+                )
+
             electricity_block = today.get("electricity")
             gas_block = today.get("gas")
 

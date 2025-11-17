@@ -19,7 +19,12 @@ async def test_coordinator_fetch_success(
     """Test successful data fetch."""
     coordinator = EssentDataUpdateCoordinator(hass)
 
-    with patch("aiohttp.ClientSession.get") as mock_get:
+    with patch("aiohttp.ClientSession.get") as mock_get, patch(
+        "homeassistant.util.dt.now"
+    ) as mock_now:
+        mock_now.return_value = dt_util.as_local(
+            dt_util.parse_datetime("2025-11-16T12:00:00")
+        )
         mock_response = AsyncMock()
         mock_response.status = 200
         mock_response.json = AsyncMock(return_value=essent_api_response)
