@@ -9,5 +9,15 @@
     "abort": {
       "already_configured": "Essent integration is already configured"
     }
+  },
+  "entity": {
+    "sensor": {
+      "electricity_current_price": {
+        "name": "Electricity current price"
+      },
+      "gas_current_price": {
+        "name": "Gas current price"
+      }
+    }
   }
 }
