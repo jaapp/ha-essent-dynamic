@@ -58,8 +58,9 @@ async def async_setup_entry(
         entities.append(EssentCurrentPriceSensor(coordinator, energy_type))
         entities.append(EssentNextPriceSensor(coordinator, energy_type))
         entities.append(EssentAveragePriceSensor(coordinator, energy_type))
-        entities.append(EssentLowestPriceSensor(coordinator, energy_type))
-        entities.append(EssentHighestPriceSensor(coordinator, energy_type))
+        if energy_type == ENERGY_TYPE_ELECTRICITY:
+            entities.append(EssentLowestPriceSensor(coordinator, energy_type))
+            entities.append(EssentHighestPriceSensor(coordinator, energy_type))
 
     async_add_entities(entities)
 
@@ -80,7 +81,8 @@ class EssentCurrentPriceSensor(EssentEntity, SensorEntity):
         super().__init__(coordinator, energy_type)
         self._attr_unique_id = f"essent_{energy_type}_current_price"
         energy_name = "Electricity" if energy_type == "electricity" else "Gas"
-        self._attr_name = f"Essent {energy_name} Current Price"
+        self._attr_name = f"{energy_name} Current Price"
+        self.entity_id = f"sensor.essent_{energy_type}_current_price"
 
     @property
     def native_value(self) -> float | None:
@@ -194,7 +196,8 @@ class EssentNextPriceSensor(EssentEntity, SensorEntity):
         super().__init__(coordinator, energy_type)
         self._attr_unique_id = f"essent_{energy_type}_next_price"
         energy_name = "Electricity" if energy_type == "electricity" else "Gas"
-        self._attr_name = f"Essent {energy_name} Next Price"
+        self._attr_name = f"{energy_name} Next Price"
+        self.entity_id = f"sensor.essent_{energy_type}_next_price"
 
     @property
     def native_value(self) -> float | None:
@@ -268,7 +271,8 @@ class EssentAveragePriceSensor(EssentEntity, SensorEntity):
         super().__init__(coordinator, energy_type)
         self._attr_unique_id = f"essent_{energy_type}_average_today"
         energy_name = "Electricity" if energy_type == "electricity" else "Gas"
-        self._attr_name = f"Essent {energy_name} Average Today"
+        self._attr_name = f"{energy_name} Average Today"
+        self.entity_id = f"sensor.essent_{energy_type}_average_today"
 
     @property
     def native_value(self) -> float | None:
@@ -307,7 +311,8 @@ class EssentLowestPriceSensor(EssentEntity, SensorEntity):
         super().__init__(coordinator, energy_type)
         self._attr_unique_id = f"essent_{energy_type}_lowest_price_today"
         energy_name = "Electricity" if energy_type == "electricity" else "Gas"
-        self._attr_name = f"Essent {energy_name} Lowest Price Today"
+        self._attr_name = f"{energy_name} Lowest Price Today"
+        self.entity_id = f"sensor.essent_{energy_type}_lowest_price_today"
 
     @property
     def native_value(self) -> float | None:
@@ -354,7 +359,8 @@ class EssentHighestPriceSensor(EssentEntity, SensorEntity):
         super().__init__(coordinator, energy_type)
         self._attr_unique_id = f"essent_{energy_type}_highest_price_today"
         energy_name = "Electricity" if energy_type == "electricity" else "Gas"
-        self._attr_name = f"Essent {energy_name} Highest Price Today"
+        self._attr_name = f"{energy_name} Highest Price Today"
+        self.entity_id = f"sensor.essent_{energy_type}_highest_price_today"
 
     @property
     def native_value(self) -> float | None:
