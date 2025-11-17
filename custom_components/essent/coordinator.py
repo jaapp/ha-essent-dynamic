@@ -1,6 +1,7 @@
 """DataUpdateCoordinator for Essent integration."""
 from datetime import datetime, timedelta
 import logging
+import random
 from typing import Any, Callable
 
 import aiohttp
@@ -10,7 +11,7 @@ from homeassistant.helpers.event import async_track_point_in_utc_time
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .const import API_ENDPOINT, API_FETCH_OFFSET_SECONDS, DOMAIN, UPDATE_INTERVAL
+from .const import API_ENDPOINT, DOMAIN, UPDATE_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -33,6 +34,22 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
         )
         self._unsub_data: Callable[[], None] | None = None
         self._unsub_listener: Callable[[], None] | None = None
+        # Random minute offset for API fetches (0-59 minutes)
+        self._api_fetch_minute_offset = random.randint(0, 59)
+
+    def start_schedules(self) -> None:
+        """Start both API fetch and listener tick schedules.
+
+        This should be called after the first successful data fetch.
+        Schedules will continue running regardless of API success/failure.
+        """
+        _LOGGER.info(
+            "Starting schedules: API fetch every hour at minute %d, "
+            "listener updates on the hour",
+            self._api_fetch_minute_offset,
+        )
+        self._schedule_data_refresh()
+        self._schedule_listener_tick()
 
     async def async_shutdown(self) -> None:
         """Cancel any scheduled call, and ignore new runs."""
@@ -45,21 +62,29 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
             self._unsub_listener = None
 
     def _schedule_data_refresh(self) -> None:
-        """Schedule next data fetch aligned near the top of the hour with a slight offset."""
+        """Schedule next data fetch at a random minute offset within the hour."""
         if self._unsub_data:
             self._unsub_data()
 
         now = dt_util.utcnow()
         current_hour = now.replace(minute=0, second=0, microsecond=0)
         candidate = current_hour + timedelta(
-            hours=1, seconds=API_FETCH_OFFSET_SECONDS
+            hours=1, minutes=self._api_fetch_minute_offset
         )
         if candidate <= now:
             candidate = candidate + timedelta(hours=1)
 
+        _LOGGER.debug(
+            "Scheduling next API fetch for %s (offset: %d minutes)",
+            candidate,
+            self._api_fetch_minute_offset,
+        )
+
         def _handle(_: datetime) -> None:
             self._unsub_data = None
             self.hass.async_create_task(self.async_request_refresh())
+            # Reschedule for next hour regardless of success/failure
+            self._schedule_data_refresh()
 
         self._unsub_data = async_track_point_in_utc_time(self.hass, _handle, candidate)
 
@@ -78,8 +103,11 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
             tzinfo=dt_util.UTC,
         )
 
+        _LOGGER.debug("Scheduling next listener tick for %s", next_run)
+
         def _handle(_: datetime) -> None:
             self._unsub_listener = None
+            _LOGGER.debug("Listener tick fired, updating sensors with cached data")
             self.async_update_listeners()
             self._schedule_listener_tick()
 
@@ -209,10 +237,6 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
                     tomorrow.get("gas") if tomorrow else None,
                 ),
             }
-
-            # Schedule hourly API fetch and hourly listener tick on cached data.
-            self._schedule_data_refresh()
-            self._schedule_listener_tick()
 
             return result
         except aiohttp.ClientError as err:

@@ -16,6 +16,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator.config_entry = entry
     await coordinator.async_config_entry_first_refresh()
 
+    # Start independent schedules for API fetch and listener updates
+    # These will continue running regardless of API success/failure
+    coordinator.start_schedules()
+
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
