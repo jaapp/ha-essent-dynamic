@@ -11,27 +11,16 @@ from custom_components.essent.const import DOMAIN
 
 async def test_full_integration_setup(
     hass: HomeAssistant,
-    electricity_api_response,
-    gas_api_response,
+    essent_api_response,
     enable_custom_integrations: None,
 ) -> None:
     """Test complete integration setup."""
     # Mock API response
     with patch("aiohttp.ClientSession.get") as mock_get:
-        mock_response_electricity = AsyncMock()
-        mock_response_electricity.status = 200
-        mock_response_electricity.json = AsyncMock(return_value=electricity_api_response)
-
-        mock_response_gas = AsyncMock()
-        mock_response_gas.status = 200
-        mock_response_gas.json = AsyncMock(return_value=gas_api_response)
-
-        ctx_electricity = AsyncMock()
-        ctx_electricity.__aenter__.return_value = mock_response_electricity
-        ctx_gas = AsyncMock()
-        ctx_gas.__aenter__.return_value = mock_response_gas
-
-        mock_get.side_effect = [ctx_electricity, ctx_gas]
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.json = AsyncMock(return_value=essent_api_response)
+        mock_get.return_value.__aenter__.return_value = mock_response
 
         # Setup integration
         assert await async_setup_component(hass, DOMAIN, {})

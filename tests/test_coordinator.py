@@ -14,26 +14,16 @@ from custom_components.essent.const import DOMAIN, UPDATE_INTERVAL
 
 
 async def test_coordinator_fetch_success(
-    hass: HomeAssistant, electricity_api_response, gas_api_response
+    hass: HomeAssistant, essent_api_response
 ) -> None:
     """Test successful data fetch."""
     coordinator = EssentDataUpdateCoordinator(hass)
 
     with patch("aiohttp.ClientSession.get") as mock_get:
-        mock_response_electricity = AsyncMock()
-        mock_response_electricity.status = 200
-        mock_response_electricity.json = AsyncMock(return_value=electricity_api_response)
-
-        mock_response_gas = AsyncMock()
-        mock_response_gas.status = 200
-        mock_response_gas.json = AsyncMock(return_value=gas_api_response)
-
-        ctx_electricity = AsyncMock()
-        ctx_electricity.__aenter__.return_value = mock_response_electricity
-        ctx_gas = AsyncMock()
-        ctx_gas.__aenter__.return_value = mock_response_gas
-
-        mock_get.side_effect = [ctx_electricity, ctx_gas]
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.json = AsyncMock(return_value=essent_api_response)
+        mock_get.return_value.__aenter__.return_value = mock_response
 
         coordinator.data = await coordinator._async_update_data()
 

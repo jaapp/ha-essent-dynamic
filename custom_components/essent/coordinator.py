@@ -11,8 +11,6 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .const import (
     API_ENDPOINT,
     DOMAIN,
-    ENERGY_TYPE_ELECTRICITY,
-    ENERGY_TYPE_GAS,
     UPDATE_INTERVAL,
 )
 
@@ -36,61 +34,34 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(seconds=UPDATE_INTERVAL),
         )
 
-    async def _fetch_energy_type(
-        self, session: aiohttp.ClientSession, energy_type: str
-    ) -> dict[str, Any]:
-        """Fetch data for a specific energy type."""
-        url = f"{API_ENDPOINT}{energy_type}"
-        async with session.get(
-            url, timeout=aiohttp.ClientTimeout(total=10), headers={"Accept": "application/json"}
-        ) as response:
-            raw_body = await response.text()
-            if response.status != 200:
-                _LOGGER.debug(
-                    "Essent API %s returned %s with body: %s",
-                    url,
-                    response.status,
-                    raw_body,
-                )
-                raise UpdateFailed(
-                    f"Error fetching {energy_type} data: {response.status}"
-                )
-
-            try:
-                data = await response.json()
-            except Exception as err:
-                _LOGGER.debug(
-                    "Failed to decode JSON for %s, body: %s", energy_type, raw_body
-                )
-                raise UpdateFailed(
-                    f"Invalid JSON received for {energy_type}: {err}"
-                ) from err
-
-        prices = data.get("prices") or []
-        if not prices:
-            _LOGGER.debug("No price data available in response for %s: %s", energy_type, data)
-            raise UpdateFailed(f"No price data available for {energy_type}")
-
-        today_data = prices[0]
-        tariffs_today = sorted(today_data.get("tariffs", []), key=_tariff_sort_key)
-        tariffs_tomorrow = []
-        if len(prices) > 1:
-            tariffs_tomorrow = sorted(
-                prices[1].get("tariffs", []), key=_tariff_sort_key
-            )
-
+    def _normalize_energy_block(self, data: dict[str, Any], energy_type: str) -> dict[str, Any]:
+        """Normalize the energy block into the coordinator format."""
+        tariffs_today = sorted(
+            data.get("tariffs", []),
+            key=_tariff_sort_key,
+        )
         if not tariffs_today:
-            _LOGGER.debug("No tariffs found for %s in payload: %s", energy_type, today_data)
+            _LOGGER.debug("No tariffs found for %s in payload: %s", energy_type, data)
             raise UpdateFailed(f"No tariffs found for {energy_type}")
 
-        amounts = [tariff["totalAmount"] for tariff in tariffs_today if "totalAmount" in tariff]
+        tariffs_tomorrow: list[dict[str, Any]] = []
+        unit = data.get("unitOfMeasurement") or data.get("unit")
+
+        amounts = [
+            tariff["totalAmount"]
+            for tariff in tariffs_today
+            if "totalAmount" in tariff
+        ]
         if not amounts:
-            _LOGGER.debug("No usable tariff values for %s in tariffs: %s", energy_type, tariffs_today)
+            _LOGGER.debug(
+                "No usable totalAmount values for %s in tariffs: %s",
+                energy_type,
+                tariffs_today,
+            )
             raise UpdateFailed(f"No usable tariff values for {energy_type}")
 
-        unit = today_data.get("unit") or today_data.get("unitOfMeasurement")
         if not unit:
-            _LOGGER.debug("No unit provided for %s in payload: %s", energy_type, today_data)
+            _LOGGER.debug("No unit provided for %s in payload: %s", energy_type, data)
             raise UpdateFailed(f"No unit provided for {energy_type}")
 
         return {
@@ -106,15 +77,52 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
         """Fetch data from API."""
         try:
             async with aiohttp.ClientSession() as session:
-                electricity = await self._fetch_energy_type(
-                    session, ENERGY_TYPE_ELECTRICITY
-                )
-                gas = await self._fetch_energy_type(session, ENERGY_TYPE_GAS)
+                async with session.get(
+                    API_ENDPOINT,
+                    timeout=aiohttp.ClientTimeout(total=10),
+                    headers={"Accept": "application/json"},
+                ) as response:
+                    raw_body = await response.text()
+                    if response.status != 200:
+                        _LOGGER.debug(
+                            "Essent API %s returned %s with body: %s",
+                            API_ENDPOINT,
+                            response.status,
+                            raw_body,
+                        )
+                        raise UpdateFailed(f"Error fetching data: {response.status}")
 
-                return {
-                    ENERGY_TYPE_ELECTRICITY: electricity,
-                    ENERGY_TYPE_GAS: gas,
-                }
+                    try:
+                        data = await response.json()
+                    except Exception as err:
+                        _LOGGER.debug(
+                            "Failed to decode JSON body: %s", raw_body
+                        )
+                        raise UpdateFailed(f"Invalid JSON received: {err}") from err
+
+            prices = data.get("prices") or []
+            if not prices:
+                _LOGGER.debug("No price data available in response: %s", data)
+                raise UpdateFailed("No price data available")
+
+            today = prices[0]
+            electricity_block = today.get("electricity")
+            gas_block = today.get("gas")
+
+            if not electricity_block or not gas_block:
+                _LOGGER.debug(
+                    "Missing electricity or gas block in payload: %s", today
+                )
+                raise UpdateFailed("Response missing electricity or gas data")
+
+            return {
+                "electricity": self._normalize_energy_block(
+                    electricity_block, "electricity"
+                ),
+                "gas": self._normalize_energy_block(
+                    gas_block, "gas"
+                ),
+            }
         except aiohttp.ClientError as err:
             raise UpdateFailed(f"Error communicating with API: {err}") from err
         except KeyError as err:

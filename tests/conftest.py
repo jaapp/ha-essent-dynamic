@@ -28,8 +28,5 @@ def gas_api_response() -> dict:
 
 @pytest.fixture
 def essent_api_response(electricity_api_response, gas_api_response) -> dict:
-    """Combined response helper for tests that patch both requests in order."""
-    return {
-        "electricity": electricity_api_response,
-        "gas": gas_api_response,
-    }
+    """Combined response helper for full integration tests."""
+    return _load_fixture("essent_api_response.json")
