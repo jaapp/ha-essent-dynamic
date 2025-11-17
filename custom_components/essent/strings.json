@@ -29,6 +29,18 @@
       },
       "gas_average_today": {
         "name": "Gas average today"
+      },
+      "electricity_lowest_price_today": {
+        "name": "Electricity lowest price today"
+      },
+      "gas_lowest_price_today": {
+        "name": "Gas lowest price today"
+      },
+      "electricity_highest_price_today": {
+        "name": "Electricity highest price today"
+      },
+      "gas_highest_price_today": {
+        "name": "Gas highest price today"
       }
     }
   }

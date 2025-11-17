@@ -11,6 +11,8 @@ from custom_components.essent.sensor import (
     EssentCurrentPriceSensor,
     EssentNextPriceSensor,
     EssentAveragePriceSensor,
+    EssentLowestPriceSensor,
+    EssentHighestPriceSensor,
 )
 
 
@@ -91,3 +93,45 @@ async def test_average_price_sensor(hass: HomeAssistant, essent_api_response) ->
     assert sensor.native_value == 0.25884625
     assert sensor.extra_state_attributes["min_price"] == 0.24009
     assert sensor.extra_state_attributes["max_price"] == 0.29107
+
+
+async def test_lowest_price_sensor(hass: HomeAssistant, essent_api_response) -> None:
+    """Test lowest price sensor."""
+    coordinator = Mock()
+    coordinator.data = {
+        "electricity": {
+            "tariffs": essent_api_response["prices"][0]["electricity"]["tariffs"],
+            "unit": "kWh",
+            "vat_percentage": 21,
+            "min_price": 0.24009,
+        }
+    }
+
+    sensor = EssentLowestPriceSensor(coordinator, ENERGY_TYPE_ELECTRICITY)
+
+    assert sensor.native_value == 0.24009
+    assert sensor.entity_registry_enabled_default is False
+    # Lowest price is at 06:00-07:00 based on fixture
+    assert "2025-11-16T06:00:00" in sensor.extra_state_attributes["start"]
+    assert "2025-11-16T07:00:00" in sensor.extra_state_attributes["end"]
+
+
+async def test_highest_price_sensor(hass: HomeAssistant, essent_api_response) -> None:
+    """Test highest price sensor."""
+    coordinator = Mock()
+    coordinator.data = {
+        "electricity": {
+            "tariffs": essent_api_response["prices"][0]["electricity"]["tariffs"],
+            "unit": "kWh",
+            "vat_percentage": 21,
+            "max_price": 0.29107,
+        }
+    }
+
+    sensor = EssentHighestPriceSensor(coordinator, ENERGY_TYPE_ELECTRICITY)
+
+    assert sensor.native_value == 0.29107
+    assert sensor.entity_registry_enabled_default is False
+    # Highest price is at 17:00-18:00 based on fixture
+    assert "2025-11-16T17:00:00" in sensor.extra_state_attributes["start"]
+    assert "2025-11-16T18:00:00" in sensor.extra_state_attributes["end"]

@@ -34,6 +34,8 @@ async def async_setup_entry(
         entities.append(EssentCurrentPriceSensor(coordinator, energy_type))
         entities.append(EssentNextPriceSensor(coordinator, energy_type))
         entities.append(EssentAveragePriceSensor(coordinator, energy_type))
+        entities.append(EssentLowestPriceSensor(coordinator, energy_type))
+        entities.append(EssentHighestPriceSensor(coordinator, energy_type))
 
     async_add_entities(entities)
 
@@ -204,3 +206,93 @@ class EssentAveragePriceSensor(EssentEntity, SensorEntity):
             "min_price": self.coordinator.data[self.energy_type]["min_price"],
             "max_price": self.coordinator.data[self.energy_type]["max_price"],
         }
+
+
+class EssentLowestPriceSensor(EssentEntity, SensorEntity):
+    """Lowest price today sensor."""
+
+    _attr_device_class = SensorDeviceClass.MONETARY
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(
+        self,
+        coordinator: EssentDataUpdateCoordinator,
+        energy_type: str,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, energy_type)
+        self._attr_unique_id = f"{energy_type}_lowest_price_today"
+        self._attr_translation_key = f"{energy_type}_lowest_price_today"
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the lowest price."""
+        return self.coordinator.data[self.energy_type]["min_price"]
+
+    @property
+    def native_unit_of_measurement(self) -> str:
+        """Return the unit of measurement."""
+        unit = self.coordinator.data[self.energy_type]["unit"]
+        return f"{CURRENCY_EURO}/{unit}"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra attributes."""
+        tariffs = self.coordinator.data[self.energy_type]["tariffs"]
+        min_price = self.coordinator.data[self.energy_type]["min_price"]
+
+        # Find tariff with minimum price
+        for tariff in tariffs:
+            if tariff["totalAmount"] == min_price:
+                return {
+                    "start": tariff["startDateTime"],
+                    "end": tariff["endDateTime"],
+                }
+
+        return {}
+
+
+class EssentHighestPriceSensor(EssentEntity, SensorEntity):
+    """Highest price today sensor."""
+
+    _attr_device_class = SensorDeviceClass.MONETARY
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(
+        self,
+        coordinator: EssentDataUpdateCoordinator,
+        energy_type: str,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, energy_type)
+        self._attr_unique_id = f"{energy_type}_highest_price_today"
+        self._attr_translation_key = f"{energy_type}_highest_price_today"
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the highest price."""
+        return self.coordinator.data[self.energy_type]["max_price"]
+
+    @property
+    def native_unit_of_measurement(self) -> str:
+        """Return the unit of measurement."""
+        unit = self.coordinator.data[self.energy_type]["unit"]
+        return f"{CURRENCY_EURO}/{unit}"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra attributes."""
+        tariffs = self.coordinator.data[self.energy_type]["tariffs"]
+        max_price = self.coordinator.data[self.energy_type]["max_price"]
+
+        # Find tariff with maximum price
+        for tariff in tariffs:
+            if tariff["totalAmount"] == max_price:
+                return {
+                    "start": tariff["startDateTime"],
+                    "end": tariff["endDateTime"],
+                }
+
+        return {}
