@@ -33,6 +33,7 @@ async def async_setup_entry(
     for energy_type in [ENERGY_TYPE_ELECTRICITY, ENERGY_TYPE_GAS]:
         entities.append(EssentCurrentPriceSensor(coordinator, energy_type))
         entities.append(EssentNextPriceSensor(coordinator, energy_type))
+        entities.append(EssentAveragePriceSensor(coordinator, energy_type))
 
     async_add_entities(entities)
 
@@ -166,4 +167,40 @@ class EssentNextPriceSensor(EssentEntity, SensorEntity):
             "tax": groups.get("TAX"),
             "start_time": next_tariff["startDateTime"],
             "end_time": next_tariff["endDateTime"],
+        }
+
+
+class EssentAveragePriceSensor(EssentEntity, SensorEntity):
+    """Average price today sensor."""
+
+    _attr_device_class = SensorDeviceClass.MONETARY
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self,
+        coordinator: EssentDataUpdateCoordinator,
+        energy_type: str,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, energy_type)
+        self._attr_unique_id = f"{energy_type}_average_today"
+        self._attr_translation_key = f"{energy_type}_average_today"
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the average price."""
+        return self.coordinator.data[self.energy_type]["avg_price"]
+
+    @property
+    def native_unit_of_measurement(self) -> str:
+        """Return the unit of measurement."""
+        unit = self.coordinator.data[self.energy_type]["unit"]
+        return f"{CURRENCY_EURO}/{unit}"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra attributes."""
+        return {
+            "min_price": self.coordinator.data[self.energy_type]["min_price"],
+            "max_price": self.coordinator.data[self.energy_type]["max_price"],
         }

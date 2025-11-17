@@ -7,7 +7,11 @@ from homeassistant.const import CURRENCY_EURO
 from homeassistant.core import HomeAssistant
 
 from custom_components.essent.const import ENERGY_TYPE_ELECTRICITY
-from custom_components.essent.sensor import EssentCurrentPriceSensor, EssentNextPriceSensor
+from custom_components.essent.sensor import (
+    EssentCurrentPriceSensor,
+    EssentNextPriceSensor,
+    EssentAveragePriceSensor,
+)
 
 
 async def test_current_price_sensor(hass: HomeAssistant, essent_api_response) -> None:
@@ -66,3 +70,24 @@ async def test_next_price_sensor(hass: HomeAssistant, essent_api_response) -> No
 
         # Next hour is 11:00-12:00
         assert sensor.native_value == 0.25704
+
+
+async def test_average_price_sensor(hass: HomeAssistant, essent_api_response) -> None:
+    """Test average price sensor."""
+    coordinator = Mock()
+    coordinator.data = {
+        "electricity": {
+            "tariffs": essent_api_response["prices"][0]["electricity"]["tariffs"],
+            "unit": "kWh",
+            "vat_percentage": 21,
+            "avg_price": 0.25884625,
+            "min_price": 0.24009,
+            "max_price": 0.29107,
+        }
+    }
+
+    sensor = EssentAveragePriceSensor(coordinator, ENERGY_TYPE_ELECTRICITY)
+
+    assert sensor.native_value == 0.25884625
+    assert sensor.extra_state_attributes["min_price"] == 0.24009
+    assert sensor.extra_state_attributes["max_price"] == 0.29107
