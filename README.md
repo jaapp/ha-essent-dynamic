@@ -8,6 +8,8 @@ Home Assistant integration for Essent dynamic energy contract prices in the Neth
 
 **Note:** This integration is specifically for customers with an Essent dynamic pricing contract. It retrieves hourly electricity prices and daily gas prices from Essent's public API.
 
+> **Disclaimer:** This integration is not affiliated with, endorsed by, or connected to Essent N.V. in any way. It is an independent community project that uses Essent's publicly available API.
+
 ## Features
 
 - Real-time electricity prices (hourly) and gas prices (daily)
