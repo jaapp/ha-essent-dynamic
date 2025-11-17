@@ -1,14 +1,14 @@
 """DataUpdateCoordinator for Essent integration."""
 from datetime import datetime, timedelta
 import logging
-from typing import Any
+from typing import Any, Callable
 
 import aiohttp
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.event import async_track_point_in_utc_time
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
-from homeassistant.helpers.event import async_call_later
 
 from .const import API_ENDPOINT, DOMAIN, UPDATE_INTERVAL
 
@@ -29,9 +29,67 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
             hass,
             _LOGGER,
             name=DOMAIN,
-            update_interval=timedelta(seconds=UPDATE_INTERVAL),
+            update_interval=None,  # explicit scheduling
         )
-        self._unsub_boundary: Callable[[], None] | None = None
+        self._unsub_data: Callable[[], None] | None = None
+        self._unsub_listener: Callable[[], None] | None = None
+
+    async def async_shutdown(self) -> None:
+        """Cancel any scheduled call, and ignore new runs."""
+        await super().async_shutdown()
+        if self._unsub_data:
+            self._unsub_data()
+            self._unsub_data = None
+        if self._unsub_listener:
+            self._unsub_listener()
+            self._unsub_listener = None
+
+    def _schedule_data_refresh(self) -> None:
+        """Schedule next data fetch aligned to the top of the hour (hourly API calls)."""
+        if self._unsub_data:
+            self._unsub_data()
+
+        now = dt_util.utcnow()
+        next_hour = now + timedelta(hours=1)
+        next_run = datetime(
+            next_hour.year,
+            next_hour.month,
+            next_hour.day,
+            next_hour.hour,
+            tzinfo=dt_util.UTC,
+        )
+
+        def _handle(_: datetime) -> None:
+            self._unsub_data = None
+            self.hass.async_create_task(self.async_request_refresh())
+
+        self._unsub_data = async_track_point_in_utc_time(self.hass, _handle, next_run)
+
+    def _schedule_listener_tick(self) -> None:
+        """Schedule listener updates on the hour to advance cached tariffs."""
+        if self._unsub_listener:
+            self._unsub_listener()
+
+        now = dt_util.utcnow()
+        next_hour = now + timedelta(hours=1)
+        next_run = datetime(
+            next_hour.year,
+            next_hour.month,
+            next_hour.day,
+            next_hour.hour,
+            tzinfo=dt_util.UTC,
+        )
+
+        def _handle(_: datetime) -> None:
+            self._unsub_listener = None
+            self.async_update_listeners()
+            self._schedule_listener_tick()
+
+        self._unsub_listener = async_track_point_in_utc_time(
+            self.hass,
+            _handle,
+            next_run,
+        )
 
     def _normalize_energy_block(
         self,
@@ -81,43 +139,6 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
             "avg_price": sum(amounts) / len(amounts),
             "max_price": max(amounts),
         }
-
-    def _set_next_refresh(self, result: dict[str, Any]) -> None:
-        """Schedule listener updates at tariff boundaries using cached data."""
-        if self._unsub_boundary:
-            self._unsub_boundary()
-
-        now = dt_util.as_local(dt_util.utcnow())
-        next_start: datetime | None = None
-
-        for energy_data in result.values():
-            for tariff in energy_data.get("tariffs", []) + energy_data.get(
-                "tariffs_tomorrow", []
-            ):
-                start = dt_util.parse_datetime(tariff.get("startDateTime"))
-                if not start:
-                    continue
-                if start.tzinfo is None:
-                    start = dt_util.as_local(start)
-                if start > now and (next_start is None or start < next_start):
-                    next_start = start
-
-        if not next_start:
-            return
-
-        delay = max(30, int((next_start - now).total_seconds()) + 1)
-
-        def _handle_boundary(_: datetime) -> None:
-            self._unsub_boundary = None
-            self.async_update_listeners()
-            if self.data:
-                self._set_next_refresh(self.data)
-
-        self._unsub_boundary = async_call_later(
-            self.hass,
-            delay,
-            _handle_boundary,
-        )
 
     async def _async_update_data(self) -> dict:
         """Fetch data from API."""
@@ -190,7 +211,11 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
                     tomorrow.get("gas") if tomorrow else None,
                 ),
             }
-            self._set_next_refresh(result)
+
+            # Schedule hourly API fetch and hourly listener tick on cached data.
+            self._schedule_data_refresh()
+            self._schedule_listener_tick()
+
             return result
         except aiohttp.ClientError as err:
             raise UpdateFailed(f"Error communicating with API: {err}") from err
