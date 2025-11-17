@@ -32,6 +32,7 @@ async def async_setup_entry(
 
     for energy_type in [ENERGY_TYPE_ELECTRICITY, ENERGY_TYPE_GAS]:
         entities.append(EssentCurrentPriceSensor(coordinator, energy_type))
+        entities.append(EssentNextPriceSensor(coordinator, energy_type))
 
     async_add_entities(entities)
 
@@ -101,4 +102,68 @@ class EssentCurrentPriceSensor(EssentEntity, SensorEntity):
             "tax": groups.get("TAX"),
             "start_time": current_tariff["startDateTime"],
             "end_time": current_tariff["endDateTime"],
+        }
+
+
+class EssentNextPriceSensor(EssentEntity, SensorEntity):
+    """Next price sensor."""
+
+    _attr_device_class = SensorDeviceClass.MONETARY
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self,
+        coordinator: EssentDataUpdateCoordinator,
+        energy_type: str,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, energy_type)
+        self._attr_unique_id = f"{energy_type}_next_price"
+        self._attr_translation_key = f"{energy_type}_next_price"
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the next price."""
+        now = dt_util.now()
+        tariffs = self.coordinator.data[self.energy_type]["tariffs"]
+
+        for tariff in tariffs:
+            start = dt_util.parse_datetime(tariff["startDateTime"])
+            if start and start > now:
+                return tariff["totalAmount"]
+
+        return None
+
+    @property
+    def native_unit_of_measurement(self) -> str:
+        """Return the unit of measurement."""
+        unit = self.coordinator.data[self.energy_type]["unit"]
+        return f"{CURRENCY_EURO}/{unit}"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra attributes."""
+        now = dt_util.now()
+        tariffs = self.coordinator.data[self.energy_type]["tariffs"]
+
+        next_tariff = None
+        for tariff in tariffs:
+            start = dt_util.parse_datetime(tariff["startDateTime"])
+            if start and start > now:
+                next_tariff = tariff
+                break
+
+        if not next_tariff:
+            return {}
+
+        groups = {g["type"]: g["amount"] for g in next_tariff["groups"]}
+
+        return {
+            "price_ex_vat": next_tariff["totalAmountEx"],
+            "vat": next_tariff["totalAmountVat"],
+            "market_price": groups.get("MARKET_PRICE"),
+            "purchasing_fee": groups.get("PURCHASING_FEE"),
+            "tax": groups.get("TAX"),
+            "start_time": next_tariff["startDateTime"],
+            "end_time": next_tariff["endDateTime"],
         }

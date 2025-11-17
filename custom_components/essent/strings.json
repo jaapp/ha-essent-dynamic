@@ -17,6 +17,12 @@
       },
       "gas_current_price": {
         "name": "Gas current price"
+      },
+      "electricity_next_price": {
+        "name": "Electricity next price"
+      },
+      "gas_next_price": {
+        "name": "Gas next price"
       }
     }
   }
