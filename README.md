@@ -6,14 +6,14 @@
 
 Home Assistant integration for Essent dynamic energy contract prices in the Netherlands.
 
-**Note:** This integration is specifically for customers with an Essent dynamic pricing contract. It retrieves hourly electricity and gas prices from Essent's public API.
+**Note:** This integration is specifically for customers with an Essent dynamic pricing contract. It retrieves hourly electricity prices and daily gas prices from Essent's public API.
 
 ## Features
 
-- Real-time electricity and gas prices
-- Hourly price updates
+- Real-time electricity prices (hourly) and gas prices (daily)
+- Automatic updates on the hour
 - Current, next, and average price sensors
-- Min/max daily price tracking
+- Min/max daily price tracking (electricity only)
 - Full Energy Dashboard integration
 - No authentication required (public API)
 
@@ -41,36 +41,52 @@ See [Energy Dashboard Guide](docs/ENERGY_DASHBOARD.md)
 
 ## Sensors
 
-### Enabled by Default
+| Sensor | Entity ID | Enabled by Default | Unit | Description |
+|--------|-----------|-------------------|------|-------------|
+| **Electricity Current Price** | `sensor.essent_electricity_current_price` | ✅ | €/kWh | Current hour's electricity price |
+| **Electricity Next Price** | `sensor.essent_electricity_next_price` | ✅ | €/kWh | Next hour's electricity price |
+| **Electricity Average Today** | `sensor.essent_electricity_average_today` | ✅ | €/kWh | Average electricity price for today |
+| **Electricity Lowest Price Today** | `sensor.essent_electricity_lowest_price_today` | ❌ | €/kWh | Lowest electricity price today with time window |
+| **Electricity Highest Price Today** | `sensor.essent_electricity_highest_price_today` | ❌ | €/kWh | Highest electricity price today with time window |
+| **Gas Current Price** | `sensor.essent_gas_current_price` | ✅ | €/m³ | Current day's gas price |
+| **Gas Next Price** | `sensor.essent_gas_next_price` | ✅ | €/m³ | Next day's gas price |
+| **Gas Price Today** | `sensor.essent_gas_average_today` | ✅ | €/m³ | Today's gas price |
 
-- **Current Price** (electricity/gas): Current hour's energy price
-- **Next Price** (electricity/gas): Next hour's energy price
-- **Average Today** (electricity/gas): Average price for current day
+### Sensor Attributes
 
-### Disabled by Default
+All current and next price sensors include detailed price component attributes from the API:
 
-- **Lowest Price Today** (electricity/gas): Minimum price with time window
-- **Highest Price Today** (electricity/gas): Maximum price with time window
+| Attribute | Description | Example Value |
+|-----------|-------------|---------------|
+| `price_ex_vat` | Price excluding VAT | 0.20743 |
+| `vat` | VAT amount | 0.04356 |
+| `market_price` | Spot market price component | 0.10285 |
+| `purchasing_fee` | Supplier purchasing fee | 0.02528 |
+| `tax` | Energy tax component | 0.12286 |
+| `start_time` | Tariff period start time | 2025-11-17T22:00:00+01:00 |
+| `end_time` | Tariff period end time | 2025-11-17T23:00:00+01:00 |
 
-## Price Components
+Average price sensors include:
 
-Each price sensor includes detailed attributes:
-- `price_ex_vat`: Price excluding VAT
-- `vat`: VAT amount
-- `market_price`: Spot market price component
-- `purchasing_fee`: Supplier purchasing fee
-- `tax`: Energy tax component
+| Attribute | Description | Example Value |
+|-----------|-------------|---------------|
+| `min_price` | Lowest price today | 0.21866 |
+| `max_price` | Highest price today | 0.28848 |
 
-## Energy Dashboard Integration
+Lowest/highest price sensors include:
 
-Current price sensors include `prices_today` and `prices_tomorrow` attributes with hourly price data formatted for Home Assistant Energy Dashboard.
+| Attribute | Description | Example Value |
+|-----------|-------------|---------------|
+| `start` | Time window start | 2025-11-17T04:00:00+01:00 |
+| `end` | Time window end | 2025-11-17T05:00:00+01:00 |
 
 ## Data Source
 
 Prices are fetched from Essent's public API:
 `https://www.essent.nl/api/public/tariffmanagement/dynamic-prices/v1/`
 
-Data updates hourly. Tomorrow's prices typically available after 13:00 CET.
+- **Electricity:** Hourly prices, updates every hour. Tomorrow's prices typically available after 13:00 CET.
+- **Gas:** Daily prices, same price for entire day.
 
 ## License
 
