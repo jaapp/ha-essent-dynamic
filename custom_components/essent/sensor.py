@@ -53,8 +53,9 @@ class EssentCurrentPriceSensor(EssentEntity, SensorEntity):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, energy_type)
-        self._attr_unique_id = f"{energy_type}_current_price"
-        self._attr_translation_key = f"{energy_type}_current_price"
+        self._attr_unique_id = f"essent_{energy_type}_current_price"
+        energy_name = "Electricity" if energy_type == "electricity" else "Gas"
+        self._attr_name = f"Essent {energy_name} Current Price"
 
     @property
     def native_value(self) -> float | None:
@@ -155,8 +156,9 @@ class EssentNextPriceSensor(EssentEntity, SensorEntity):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, energy_type)
-        self._attr_unique_id = f"{energy_type}_next_price"
-        self._attr_translation_key = f"{energy_type}_next_price"
+        self._attr_unique_id = f"essent_{energy_type}_next_price"
+        energy_name = "Electricity" if energy_type == "electricity" else "Gas"
+        self._attr_name = f"Essent {energy_name} Next Price"
 
     @property
     def native_value(self) -> float | None:
@@ -223,8 +225,9 @@ class EssentAveragePriceSensor(EssentEntity, SensorEntity):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, energy_type)
-        self._attr_unique_id = f"{energy_type}_average_today"
-        self._attr_translation_key = f"{energy_type}_average_today"
+        self._attr_unique_id = f"essent_{energy_type}_average_today"
+        energy_name = "Electricity" if energy_type == "electricity" else "Gas"
+        self._attr_name = f"Essent {energy_name} Average Today"
 
     @property
     def native_value(self) -> float | None:
@@ -260,8 +263,9 @@ class EssentLowestPriceSensor(EssentEntity, SensorEntity):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, energy_type)
-        self._attr_unique_id = f"{energy_type}_lowest_price_today"
-        self._attr_translation_key = f"{energy_type}_lowest_price_today"
+        self._attr_unique_id = f"essent_{energy_type}_lowest_price_today"
+        energy_name = "Electricity" if energy_type == "electricity" else "Gas"
+        self._attr_name = f"Essent {energy_name} Lowest Price Today"
 
     @property
     def native_value(self) -> float | None:
@@ -305,8 +309,9 @@ class EssentHighestPriceSensor(EssentEntity, SensorEntity):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, energy_type)
-        self._attr_unique_id = f"{energy_type}_highest_price_today"
-        self._attr_translation_key = f"{energy_type}_highest_price_today"
+        self._attr_unique_id = f"essent_{energy_type}_highest_price_today"
+        energy_name = "Electricity" if energy_type == "electricity" else "Gas"
+        self._attr_name = f"Essent {energy_name} Highest Price Today"
 
     @property
     def native_value(self) -> float | None:
