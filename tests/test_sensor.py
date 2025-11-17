@@ -143,7 +143,7 @@ async def test_highest_price_sensor(
 async def test_current_price_energy_dashboard_attributes(
     hass: HomeAssistant, electricity_api_response: dict
 ) -> None:
-    """Test current price sensor has Energy Dashboard attributes."""
+    """Test current price sensor attributes."""
     coordinator = _coordinator_from_fixture(electricity_api_response)
 
     sensor = EssentCurrentPriceSensor(coordinator, ENERGY_TYPE_ELECTRICITY)
@@ -155,7 +155,10 @@ async def test_current_price_energy_dashboard_attributes(
 
         attrs = sensor.extra_state_attributes
 
-        assert "prices_today" in attrs
-        assert len(attrs["prices_today"]) == 3
-        assert attrs["prices_today"][1]["value"] == 0.25  # Current hour price
-        assert len(attrs["prices_tomorrow"]) == 2
+        # Should NOT have prices arrays (removed for performance)
+        assert "prices_today" not in attrs
+        assert "prices_tomorrow" not in attrs
+
+        # Should still have current price breakdown
+        assert "price_ex_vat" in attrs
+        assert "market_price" in attrs

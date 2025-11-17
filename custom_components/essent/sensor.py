@@ -108,9 +108,6 @@ class EssentCurrentPriceSensor(EssentEntity, SensorEntity):
         """Return extra attributes."""
         now = dt_util.now()
         tariffs_today = self.coordinator.data[self.energy_type]["tariffs"]
-        tariffs_tomorrow = self.coordinator.data[self.energy_type].get(
-            "tariffs_tomorrow", []
-        )
 
         # Find current tariff
         current_tariff = None
@@ -136,46 +133,6 @@ class EssentCurrentPriceSensor(EssentEntity, SensorEntity):
                     "end_time": _format_dt_str(current_tariff["endDateTime"]),
                 }
             )
-
-        # Energy Dashboard integration - today's hourly prices
-        today = dt_util.start_of_local_day()
-        tomorrow = today + timedelta(days=1)
-        day_after_tomorrow = tomorrow + timedelta(days=1)
-
-        today_prices = []
-        tomorrow_prices = []
-
-        for tariff in tariffs_today:
-            start, _ = _parse_tariff_times(tariff)
-            if not start:
-                continue
-
-            price_entry = {
-                "start": tariff["startDateTime"],
-                "end": tariff["endDateTime"],
-                "value": tariff["totalAmount"],
-            }
-
-            if today <= start < tomorrow:
-                today_prices.append(price_entry)
-            elif tomorrow <= start < day_after_tomorrow:
-                tomorrow_prices.append(price_entry)
-
-        for tariff in tariffs_tomorrow:
-            start, _ = _parse_tariff_times(tariff)
-            if not start:
-                continue
-            if tomorrow <= start < day_after_tomorrow:
-                tomorrow_prices.append(
-                    {
-                        "start": tariff["startDateTime"],
-                        "end": tariff["endDateTime"],
-                        "value": tariff["totalAmount"],
-                    }
-                )
-
-        attributes["prices_today"] = today_prices
-        attributes["prices_tomorrow"] = tomorrow_prices
 
         return attributes
 
