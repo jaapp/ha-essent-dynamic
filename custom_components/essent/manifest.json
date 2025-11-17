@@ -1,0 +1,10 @@
+{
+  "domain": "essent",
+  "name": "Essent",
+  "codeowners": ["@jwpieroen"],
+  "config_flow": true,
+  "documentation": "https://github.com/jwpieroen/essent-ha-integration",
+  "iot_class": "cloud_polling",
+  "requirements": [],
+  "version": "1.0.0"
+}
