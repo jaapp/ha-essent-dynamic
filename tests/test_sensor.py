@@ -135,3 +135,29 @@ async def test_highest_price_sensor(hass: HomeAssistant, essent_api_response) ->
     # Highest price is at 17:00-18:00 based on fixture
     assert "2025-11-16T17:00:00" in sensor.extra_state_attributes["start"]
     assert "2025-11-16T18:00:00" in sensor.extra_state_attributes["end"]
+
+
+async def test_current_price_energy_dashboard_attributes(
+    hass: HomeAssistant, essent_api_response
+) -> None:
+    """Test current price sensor has Energy Dashboard attributes."""
+    coordinator = Mock()
+    coordinator.data = {
+        "electricity": {
+            "tariffs": essent_api_response["prices"][0]["electricity"]["tariffs"],
+            "unit": "kWh",
+            "vat_percentage": 21,
+        }
+    }
+
+    sensor = EssentCurrentPriceSensor(coordinator, ENERGY_TYPE_ELECTRICITY)
+
+    with patch("custom_components.essent.sensor.dt_util.now") as mock_now:
+        mock_now.return_value = datetime.fromisoformat("2025-11-16T10:30:00")
+
+        attrs = sensor.extra_state_attributes
+
+        # Should have today's prices for Energy Dashboard
+        assert "prices_today" in attrs
+        assert len(attrs["prices_today"]) == 24
+        assert attrs["prices_today"][0]["value"] == 0.25353  # First hour price

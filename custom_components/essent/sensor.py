@@ -1,7 +1,7 @@
 """Sensor platform for Essent integration."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -91,21 +91,49 @@ class EssentCurrentPriceSensor(EssentEntity, SensorEntity):
                 current_tariff = tariff
                 break
 
-        if not current_tariff:
-            return {}
+        attributes: dict[str, Any] = {}
 
-        # Extract price components
-        groups = {g["type"]: g["amount"] for g in current_tariff["groups"]}
+        # Current price breakdown
+        if current_tariff:
+            groups = {g["type"]: g["amount"] for g in current_tariff["groups"]}
+            attributes.update({
+                "price_ex_vat": current_tariff["totalAmountEx"],
+                "vat": current_tariff["totalAmountVat"],
+                "market_price": groups.get("MARKET_PRICE"),
+                "purchasing_fee": groups.get("PURCHASING_FEE"),
+                "tax": groups.get("TAX"),
+                "start_time": current_tariff["startDateTime"],
+                "end_time": current_tariff["endDateTime"],
+            })
 
-        return {
-            "price_ex_vat": current_tariff["totalAmountEx"],
-            "vat": current_tariff["totalAmountVat"],
-            "market_price": groups.get("MARKET_PRICE"),
-            "purchasing_fee": groups.get("PURCHASING_FEE"),
-            "tax": groups.get("TAX"),
-            "start_time": current_tariff["startDateTime"],
-            "end_time": current_tariff["endDateTime"],
-        }
+        # Energy Dashboard integration - today's hourly prices
+        today = dt_util.start_of_local_day()
+        tomorrow = today + timedelta(days=1)
+
+        today_prices = []
+        tomorrow_prices = []
+
+        for tariff in tariffs:
+            start = dt_util.parse_datetime(tariff["startDateTime"])
+            if not start:
+                continue
+
+            price_entry = {
+                "start": tariff["startDateTime"],
+                "end": tariff["endDateTime"],
+                "value": tariff["totalAmount"],
+            }
+
+            if today <= start < tomorrow:
+                today_prices.append(price_entry)
+            elif start >= tomorrow:
+                tomorrow_prices.append(price_entry)
+
+        attributes["prices_today"] = today_prices
+        if tomorrow_prices:
+            attributes["prices_tomorrow"] = tomorrow_prices
+
+        return attributes
 
 
 class EssentNextPriceSensor(EssentEntity, SensorEntity):
