@@ -1,3 +1,5 @@
+<img width="2560" height="564" alt="afbeelding" src="https://github.com/user-attachments/assets/a33b7c89-e685-4eed-ab2a-b3712c57aeb1" />
+
 # Essent Dynamic Prices - Home Assistant Integration
 
 > ⚠️ **EXPERIMENTAL** - This integration is in early development and has not been extensively tested. Use at your own risk. Please report any issues on GitHub.
