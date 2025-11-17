@@ -1,5 +1,7 @@
 # Essent Dynamic Prices - Home Assistant Integration
 
+> ⚠️ **EXPERIMENTAL** - This integration is in early development and has not been extensively tested. Use at your own risk. Please report any issues on GitHub.
+
 Home Assistant integration for Essent dynamic energy contract prices in the Netherlands.
 
 **Note:** This integration is specifically for customers with an Essent dynamic pricing contract. It retrieves hourly electricity and gas prices from Essent's public API.
