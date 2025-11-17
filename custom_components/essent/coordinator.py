@@ -6,7 +6,7 @@ from typing import Any, Callable
 
 import aiohttp
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_point_in_utc_time
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
@@ -80,7 +80,9 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
             self._api_fetch_minute_offset,
         )
 
+        @callback
         def _handle(_: datetime) -> None:
+            """Handle the scheduled API refresh trigger."""
             self._unsub_data = None
             self.hass.async_create_task(self.async_request_refresh())
             # Reschedule for next hour regardless of success/failure
@@ -105,7 +107,9 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
 
         _LOGGER.debug("Scheduling next listener tick for %s", next_run)
 
+        @callback
         def _handle(_: datetime) -> None:
+            """Handle the scheduled listener tick to update sensors."""
             self._unsub_listener = None
             _LOGGER.debug("Listener tick fired, updating sensors with cached data")
             self.async_update_listeners()
