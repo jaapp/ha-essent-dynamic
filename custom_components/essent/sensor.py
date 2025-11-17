@@ -44,7 +44,7 @@ class EssentCurrentPriceSensor(EssentEntity, SensorEntity):
     """Current price sensor."""
 
     _attr_device_class = SensorDeviceClass.MONETARY
-    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_state_class = None  # Monetary sensors don't use state_class
 
     def __init__(
         self,
@@ -65,8 +65,14 @@ class EssentCurrentPriceSensor(EssentEntity, SensorEntity):
         for tariff in tariffs:
             start = dt_util.parse_datetime(tariff["startDateTime"])
             end = dt_util.parse_datetime(tariff["endDateTime"])
-            if start and end and start <= now < end:
-                return tariff["totalAmount"]
+            if start and end:
+                # Ensure timezone-aware comparison
+                if not start.tzinfo:
+                    start = dt_util.as_local(start)
+                if not end.tzinfo:
+                    end = dt_util.as_local(end)
+                if start <= now < end:
+                    return tariff["totalAmount"]
 
         return None
 
@@ -140,7 +146,7 @@ class EssentNextPriceSensor(EssentEntity, SensorEntity):
     """Next price sensor."""
 
     _attr_device_class = SensorDeviceClass.MONETARY
-    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_state_class = None  # Monetary sensors don't use state_class
 
     def __init__(
         self,
@@ -160,8 +166,12 @@ class EssentNextPriceSensor(EssentEntity, SensorEntity):
 
         for tariff in tariffs:
             start = dt_util.parse_datetime(tariff["startDateTime"])
-            if start and start > now:
-                return tariff["totalAmount"]
+            if start:
+                # Ensure timezone-aware comparison
+                if not start.tzinfo:
+                    start = dt_util.as_local(start)
+                if start > now:
+                    return tariff["totalAmount"]
 
         return None
 
@@ -204,7 +214,7 @@ class EssentAveragePriceSensor(EssentEntity, SensorEntity):
     """Average price today sensor."""
 
     _attr_device_class = SensorDeviceClass.MONETARY
-    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_state_class = None  # Monetary sensors don't use state_class
 
     def __init__(
         self,
@@ -240,7 +250,7 @@ class EssentLowestPriceSensor(EssentEntity, SensorEntity):
     """Lowest price today sensor."""
 
     _attr_device_class = SensorDeviceClass.MONETARY
-    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_state_class = None  # Monetary sensors don't use state_class
     _attr_entity_registry_enabled_default = False
 
     def __init__(
@@ -285,7 +295,7 @@ class EssentHighestPriceSensor(EssentEntity, SensorEntity):
     """Highest price today sensor."""
 
     _attr_device_class = SensorDeviceClass.MONETARY
-    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_state_class = None  # Monetary sensors don't use state_class
     _attr_entity_registry_enabled_default = False
 
     def __init__(
