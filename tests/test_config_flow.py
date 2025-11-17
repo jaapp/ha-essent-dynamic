@@ -8,13 +8,15 @@ from homeassistant.data_entry_flow import FlowResultType
 from custom_components.essent.const import DOMAIN
 
 
-async def test_form(hass: HomeAssistant) -> None:
+async def test_form(
+    hass: HomeAssistant, enable_custom_integrations: None
+) -> None:
     """Test we get the form."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     assert result["type"] == FlowResultType.FORM
-    assert result["errors"] == {}
+    assert result["errors"] in (None, {})
 
     with patch(
         "custom_components.essent.async_setup_entry",

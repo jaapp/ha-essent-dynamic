@@ -7,7 +7,6 @@ from typing import Any
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
-    SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CURRENCY_EURO
@@ -18,6 +17,19 @@ from homeassistant.util import dt as dt_util
 from .const import DOMAIN, ENERGY_TYPE_ELECTRICITY, ENERGY_TYPE_GAS
 from .coordinator import EssentDataUpdateCoordinator
 from .entity import EssentEntity
+
+
+def _parse_tariff_times(tariff: dict[str, Any]) -> tuple[datetime | None, datetime | None]:
+    """Parse tariff start/end times and ensure they are timezone-aware."""
+    start = dt_util.parse_datetime(tariff.get("startDateTime"))
+    end = dt_util.parse_datetime(tariff.get("endDateTime"))
+
+    if start and start.tzinfo is None:
+        start = dt_util.as_local(start)
+    if end and end.tzinfo is None:
+        end = dt_util.as_local(end)
+
+    return start, end
 
 
 async def async_setup_entry(
@@ -64,16 +76,9 @@ class EssentCurrentPriceSensor(EssentEntity, SensorEntity):
         tariffs = self.coordinator.data[self.energy_type]["tariffs"]
 
         for tariff in tariffs:
-            start = dt_util.parse_datetime(tariff["startDateTime"])
-            end = dt_util.parse_datetime(tariff["endDateTime"])
-            if start and end:
-                # Ensure timezone-aware comparison
-                if not start.tzinfo:
-                    start = dt_util.as_local(start)
-                if not end.tzinfo:
-                    end = dt_util.as_local(end)
-                if start <= now < end:
-                    return tariff["totalAmount"]
+            start, end = _parse_tariff_times(tariff)
+            if start and end and start <= now < end:
+                return tariff["totalAmount"]
 
         return None
 
@@ -87,13 +92,15 @@ class EssentCurrentPriceSensor(EssentEntity, SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra attributes."""
         now = dt_util.now()
-        tariffs = self.coordinator.data[self.energy_type]["tariffs"]
+        tariffs_today = self.coordinator.data[self.energy_type]["tariffs"]
+        tariffs_tomorrow = self.coordinator.data[self.energy_type].get(
+            "tariffs_tomorrow", []
+        )
 
         # Find current tariff
         current_tariff = None
-        for tariff in tariffs:
-            start = dt_util.parse_datetime(tariff["startDateTime"])
-            end = dt_util.parse_datetime(tariff["endDateTime"])
+        for tariff in tariffs_today:
+            start, end = _parse_tariff_times(tariff)
             if start and end and start <= now < end:
                 current_tariff = tariff
                 break
@@ -103,25 +110,28 @@ class EssentCurrentPriceSensor(EssentEntity, SensorEntity):
         # Current price breakdown
         if current_tariff:
             groups = {g["type"]: g["amount"] for g in current_tariff["groups"]}
-            attributes.update({
-                "price_ex_vat": current_tariff["totalAmountEx"],
-                "vat": current_tariff["totalAmountVat"],
-                "market_price": groups.get("MARKET_PRICE"),
-                "purchasing_fee": groups.get("PURCHASING_FEE"),
-                "tax": groups.get("TAX"),
-                "start_time": current_tariff["startDateTime"],
-                "end_time": current_tariff["endDateTime"],
-            })
+            attributes.update(
+                {
+                    "price_ex_vat": current_tariff["totalAmountEx"],
+                    "vat": current_tariff["totalAmountVat"],
+                    "market_price": groups.get("MARKET_PRICE"),
+                    "purchasing_fee": groups.get("PURCHASING_FEE"),
+                    "tax": groups.get("TAX"),
+                    "start_time": current_tariff["startDateTime"],
+                    "end_time": current_tariff["endDateTime"],
+                }
+            )
 
         # Energy Dashboard integration - today's hourly prices
         today = dt_util.start_of_local_day()
         tomorrow = today + timedelta(days=1)
+        day_after_tomorrow = tomorrow + timedelta(days=1)
 
         today_prices = []
         tomorrow_prices = []
 
-        for tariff in tariffs:
-            start = dt_util.parse_datetime(tariff["startDateTime"])
+        for tariff in tariffs_today:
+            start, _ = _parse_tariff_times(tariff)
             if not start:
                 continue
 
@@ -133,12 +143,24 @@ class EssentCurrentPriceSensor(EssentEntity, SensorEntity):
 
             if today <= start < tomorrow:
                 today_prices.append(price_entry)
-            elif start >= tomorrow:
+            elif tomorrow <= start < day_after_tomorrow:
                 tomorrow_prices.append(price_entry)
 
+        for tariff in tariffs_tomorrow:
+            start, _ = _parse_tariff_times(tariff)
+            if not start:
+                continue
+            if tomorrow <= start < day_after_tomorrow:
+                tomorrow_prices.append(
+                    {
+                        "start": tariff["startDateTime"],
+                        "end": tariff["endDateTime"],
+                        "value": tariff["totalAmount"],
+                    }
+                )
+
         attributes["prices_today"] = today_prices
-        if tomorrow_prices:
-            attributes["prices_tomorrow"] = tomorrow_prices
+        attributes["prices_tomorrow"] = tomorrow_prices
 
         return attributes
 
@@ -164,16 +186,16 @@ class EssentNextPriceSensor(EssentEntity, SensorEntity):
     def native_value(self) -> float | None:
         """Return the next price."""
         now = dt_util.now()
-        tariffs = self.coordinator.data[self.energy_type]["tariffs"]
+        tariffs_today = self.coordinator.data[self.energy_type]["tariffs"]
+        tariffs_tomorrow = self.coordinator.data[self.energy_type].get(
+            "tariffs_tomorrow", []
+        )
+        tariffs: list[dict[str, Any]] = tariffs_today + tariffs_tomorrow
 
         for tariff in tariffs:
-            start = dt_util.parse_datetime(tariff["startDateTime"])
-            if start:
-                # Ensure timezone-aware comparison
-                if not start.tzinfo:
-                    start = dt_util.as_local(start)
-                if start > now:
-                    return tariff["totalAmount"]
+            start, _ = _parse_tariff_times(tariff)
+            if start and start > now:
+                return tariff["totalAmount"]
 
         return None
 
@@ -187,11 +209,15 @@ class EssentNextPriceSensor(EssentEntity, SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra attributes."""
         now = dt_util.now()
-        tariffs = self.coordinator.data[self.energy_type]["tariffs"]
+        tariffs_today = self.coordinator.data[self.energy_type]["tariffs"]
+        tariffs_tomorrow = self.coordinator.data[self.energy_type].get(
+            "tariffs_tomorrow", []
+        )
+        tariffs: list[dict[str, Any]] = tariffs_today + tariffs_tomorrow
 
         next_tariff = None
         for tariff in tariffs:
-            start = dt_util.parse_datetime(tariff["startDateTime"])
+            start, _ = _parse_tariff_times(tariff)
             if start and start > now:
                 next_tariff = tariff
                 break

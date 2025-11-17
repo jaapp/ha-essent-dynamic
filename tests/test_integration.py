@@ -4,32 +4,43 @@ from unittest.mock import AsyncMock, patch
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.essent.const import DOMAIN
 
 
-async def test_full_integration_setup(hass: HomeAssistant, essent_api_response) -> None:
+async def test_full_integration_setup(
+    hass: HomeAssistant,
+    electricity_api_response,
+    gas_api_response,
+    enable_custom_integrations: None,
+) -> None:
     """Test complete integration setup."""
     # Mock API response
     with patch("aiohttp.ClientSession.get") as mock_get:
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.json = AsyncMock(return_value=essent_api_response)
-        mock_get.return_value.__aenter__.return_value = mock_response
+        mock_response_electricity = AsyncMock()
+        mock_response_electricity.status = 200
+        mock_response_electricity.json = AsyncMock(return_value=electricity_api_response)
+
+        mock_response_gas = AsyncMock()
+        mock_response_gas.status = 200
+        mock_response_gas.json = AsyncMock(return_value=gas_api_response)
+
+        ctx_electricity = AsyncMock()
+        ctx_electricity.__aenter__.return_value = mock_response_electricity
+        ctx_gas = AsyncMock()
+        ctx_gas.__aenter__.return_value = mock_response_gas
+
+        mock_get.side_effect = [ctx_electricity, ctx_gas]
 
         # Setup integration
         assert await async_setup_component(hass, DOMAIN, {})
         await hass.async_block_till_done()
 
-        # Create config entry
-        from homeassistant.config_entries import ConfigEntry
-
-        entry = ConfigEntry(
-            version=1,
+        entry = MockConfigEntry(
             domain=DOMAIN,
             title="Essent",
             data={},
-            source="user",
             unique_id="essent_dynamic_prices",
         )
 
@@ -51,7 +62,7 @@ async def test_full_integration_setup(hass: HomeAssistant, essent_api_response) 
         # Verify sensor states
         elec_current = hass.states.get("sensor.essent_electricity_current_price")
         assert elec_current.state != "unavailable"
-        assert elec_current.attributes.get("unit_of_measurement") == "EUR/kWh"
+        assert elec_current.attributes.get("unit_of_measurement") == "€/kWh"
 
         # Verify unload
         assert await hass.config_entries.async_unload(entry.entry_id)
