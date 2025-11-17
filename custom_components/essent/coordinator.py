@@ -8,11 +8,7 @@ import aiohttp
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import (
-    API_ENDPOINT,
-    DOMAIN,
-    UPDATE_INTERVAL,
-)
+from .const import API_ENDPOINT, DOMAIN, UPDATE_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,7 +30,12 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(seconds=UPDATE_INTERVAL),
         )
 
-    def _normalize_energy_block(self, data: dict[str, Any], energy_type: str) -> dict[str, Any]:
+    def _normalize_energy_block(
+        self,
+        data: dict[str, Any],
+        energy_type: str,
+        tomorrow: dict[str, Any] | None,
+    ) -> dict[str, Any]:
         """Normalize the energy block into the coordinator format."""
         tariffs_today = sorted(
             data.get("tariffs", []),
@@ -45,6 +46,11 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
             raise UpdateFailed(f"No tariffs found for {energy_type}")
 
         tariffs_tomorrow: list[dict[str, Any]] = []
+        if tomorrow:
+            tariffs_tomorrow = sorted(
+                tomorrow.get("tariffs", []),
+                key=_tariff_sort_key,
+            )
         unit = data.get("unitOfMeasurement") or data.get("unit")
 
         amounts = [
@@ -106,6 +112,7 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
                 raise UpdateFailed("No price data available")
 
             today = prices[0]
+            tomorrow = prices[1] if len(prices) > 1 else None
             electricity_block = today.get("electricity")
             gas_block = today.get("gas")
 
@@ -117,10 +124,14 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
 
             return {
                 "electricity": self._normalize_energy_block(
-                    electricity_block, "electricity"
+                    electricity_block,
+                    "electricity",
+                    tomorrow.get("electricity") if tomorrow else None,
                 ),
                 "gas": self._normalize_energy_block(
-                    gas_block, "gas"
+                    gas_block,
+                    "gas",
+                    tomorrow.get("gas") if tomorrow else None,
                 ),
             }
         except aiohttp.ClientError as err:

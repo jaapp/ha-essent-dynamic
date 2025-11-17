@@ -32,6 +32,18 @@ def _parse_tariff_times(tariff: dict[str, Any]) -> tuple[datetime | None, dateti
     return start, end
 
 
+def _format_dt_str(value: str | None) -> str | None:
+    """Format a datetime string as local ISO, falling back to original."""
+    if not value:
+        return None
+    parsed = dt_util.parse_datetime(value)
+    if not parsed:
+        return value
+    if parsed.tzinfo is None:
+        parsed = dt_util.as_local(parsed)
+    return parsed.isoformat()
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -57,6 +69,7 @@ class EssentCurrentPriceSensor(EssentEntity, SensorEntity):
 
     _attr_device_class = SensorDeviceClass.MONETARY
     _attr_state_class = None  # Monetary sensors don't use state_class
+    _attr_suggested_display_precision = 3
 
     def __init__(
         self,
@@ -117,8 +130,8 @@ class EssentCurrentPriceSensor(EssentEntity, SensorEntity):
                     "market_price": groups.get("MARKET_PRICE"),
                     "purchasing_fee": groups.get("PURCHASING_FEE"),
                     "tax": groups.get("TAX"),
-                    "start_time": current_tariff["startDateTime"],
-                    "end_time": current_tariff["endDateTime"],
+                    "start_time": _format_dt_str(current_tariff["startDateTime"]),
+                    "end_time": _format_dt_str(current_tariff["endDateTime"]),
                 }
             )
 
@@ -170,6 +183,7 @@ class EssentNextPriceSensor(EssentEntity, SensorEntity):
 
     _attr_device_class = SensorDeviceClass.MONETARY
     _attr_state_class = None  # Monetary sensors don't use state_class
+    _attr_suggested_display_precision = 3
 
     def __init__(
         self,
@@ -233,8 +247,8 @@ class EssentNextPriceSensor(EssentEntity, SensorEntity):
             "market_price": groups.get("MARKET_PRICE"),
             "purchasing_fee": groups.get("PURCHASING_FEE"),
             "tax": groups.get("TAX"),
-            "start_time": next_tariff["startDateTime"],
-            "end_time": next_tariff["endDateTime"],
+            "start_time": _format_dt_str(next_tariff["startDateTime"]),
+            "end_time": _format_dt_str(next_tariff["endDateTime"]),
         }
 
 
@@ -243,6 +257,7 @@ class EssentAveragePriceSensor(EssentEntity, SensorEntity):
 
     _attr_device_class = SensorDeviceClass.MONETARY
     _attr_state_class = None  # Monetary sensors don't use state_class
+    _attr_suggested_display_precision = 3
 
     def __init__(
         self,
@@ -281,6 +296,7 @@ class EssentLowestPriceSensor(EssentEntity, SensorEntity):
     _attr_device_class = SensorDeviceClass.MONETARY
     _attr_state_class = None  # Monetary sensors don't use state_class
     _attr_entity_registry_enabled_default = False
+    _attr_suggested_display_precision = 3
 
     def __init__(
         self,
@@ -314,8 +330,8 @@ class EssentLowestPriceSensor(EssentEntity, SensorEntity):
         for tariff in tariffs:
             if tariff["totalAmount"] == min_price:
                 return {
-                    "start": tariff["startDateTime"],
-                    "end": tariff["endDateTime"],
+                    "start": _format_dt_str(tariff["startDateTime"]),
+                    "end": _format_dt_str(tariff["endDateTime"]),
                 }
 
         return {}
@@ -327,6 +343,7 @@ class EssentHighestPriceSensor(EssentEntity, SensorEntity):
     _attr_device_class = SensorDeviceClass.MONETARY
     _attr_state_class = None  # Monetary sensors don't use state_class
     _attr_entity_registry_enabled_default = False
+    _attr_suggested_display_precision = 3
 
     def __init__(
         self,
@@ -360,8 +377,8 @@ class EssentHighestPriceSensor(EssentEntity, SensorEntity):
         for tariff in tariffs:
             if tariff["totalAmount"] == max_price:
                 return {
-                    "start": tariff["startDateTime"],
-                    "end": tariff["endDateTime"],
+                    "start": _format_dt_str(tariff["startDateTime"]),
+                    "end": _format_dt_str(tariff["endDateTime"]),
                 }
 
         return {}
