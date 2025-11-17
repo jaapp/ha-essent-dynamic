@@ -41,16 +41,34 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
     ) -> dict[str, Any]:
         """Fetch data for a specific energy type."""
         url = f"{API_ENDPOINT}{energy_type}"
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
+        async with session.get(
+            url, timeout=aiohttp.ClientTimeout(total=10), headers={"Accept": "application/json"}
+        ) as response:
+            raw_body = await response.text()
             if response.status != 200:
+                _LOGGER.debug(
+                    "Essent API %s returned %s with body: %s",
+                    url,
+                    response.status,
+                    raw_body,
+                )
                 raise UpdateFailed(
                     f"Error fetching {energy_type} data: {response.status}"
                 )
 
-            data = await response.json()
+            try:
+                data = await response.json()
+            except Exception as err:
+                _LOGGER.debug(
+                    "Failed to decode JSON for %s, body: %s", energy_type, raw_body
+                )
+                raise UpdateFailed(
+                    f"Invalid JSON received for {energy_type}: {err}"
+                ) from err
 
         prices = data.get("prices") or []
         if not prices:
+            _LOGGER.debug("No price data available in response for %s: %s", energy_type, data)
             raise UpdateFailed(f"No price data available for {energy_type}")
 
         today_data = prices[0]
@@ -62,14 +80,17 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
             )
 
         if not tariffs_today:
+            _LOGGER.debug("No tariffs found for %s in payload: %s", energy_type, today_data)
             raise UpdateFailed(f"No tariffs found for {energy_type}")
 
         amounts = [tariff["totalAmount"] for tariff in tariffs_today if "totalAmount" in tariff]
         if not amounts:
+            _LOGGER.debug("No usable tariff values for %s in tariffs: %s", energy_type, tariffs_today)
             raise UpdateFailed(f"No usable tariff values for {energy_type}")
 
         unit = today_data.get("unit") or today_data.get("unitOfMeasurement")
         if not unit:
+            _LOGGER.debug("No unit provided for %s in payload: %s", energy_type, today_data)
             raise UpdateFailed(f"No unit provided for {energy_type}")
 
         return {
