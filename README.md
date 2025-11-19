@@ -2,8 +2,6 @@
 
 # Essent Dynamic Prices - Home Assistant Integration
 
-> ⚠️ **EXPERIMENTAL** - This integration is in early development and has not been extensively tested. Use at your own risk. Please report any issues on GitHub.
-
 Home Assistant integration for Essent dynamic energy contract prices in the Netherlands.
 
 **Note:** This integration is specifically for customers with an Essent dynamic pricing contract. It retrieves hourly electricity prices and daily gas prices from Essent's public API.
@@ -86,8 +84,8 @@ Lowest/highest price sensors include:
 Prices are fetched from Essent's public API:
 `https://www.essent.nl/api/public/tariffmanagement/dynamic-prices/v1/`
 
-- **Electricity:** Hourly prices, updates every hour. Tomorrow's prices typically available after 13:00 CET.
-- **Gas:** Daily prices, same price for entire day.
+- **Electricity:** Hourly prices, updates every hour. Tomorrow's prices available after 12:00 CET.
+- **Gas:** Daily prices, same price for entire day. Tomorrow's price available after 19:00 CET.
 
 ## License
 
