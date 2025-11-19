@@ -9,7 +9,7 @@ from .coordinator import EssentDataUpdateCoordinator
 class EssentEntity(CoordinatorEntity[EssentDataUpdateCoordinator]):
     """Base class for Essent entities."""
 
-    _attr_has_entity_name = False
+    _attr_has_entity_name = True
 
     def __init__(
         self,

@@ -43,13 +43,13 @@ See [Energy Dashboard Guide](docs/ENERGY_DASHBOARD.md)
 
 | Sensor | Entity ID | Enabled by Default | Unit | Description |
 |--------|-----------|-------------------|------|-------------|
-| **Electricity Current Price** | `sensor.essent_electricity_current_price` | ✅ | €/kWh | Current hour's electricity price |
-| **Electricity Next Price** | `sensor.essent_electricity_next_price` | ✅ | €/kWh | Next hour's electricity price |
-| **Electricity Average Today** | `sensor.essent_electricity_average_today` | ✅ | €/kWh | Average electricity price for today |
-| **Electricity Lowest Price Today** | `sensor.essent_electricity_lowest_price_today` | ❌ | €/kWh | Lowest electricity price today with time window |
-| **Electricity Highest Price Today** | `sensor.essent_electricity_highest_price_today` | ❌ | €/kWh | Highest electricity price today with time window |
-| **Gas Current Price** | `sensor.essent_gas_current_price` | ✅ | €/m³ | Current day's gas price |
-| **Gas Next Price** | `sensor.essent_gas_next_price` | ✅ | €/m³ | Next day's gas price |
+| **Essent Dynamic Prices Electricity current price** | `sensor.essent_electricity_current_price` | ✅ | €/kWh | Current hour's electricity price |
+| **Essent Dynamic Prices Electricity next price** | `sensor.essent_electricity_next_price` | ✅ | €/kWh | Next hour's electricity price |
+| **Essent Dynamic Prices Electricity average today** | `sensor.essent_electricity_average_today` | ✅ | €/kWh | Average electricity price for today |
+| **Essent Dynamic Prices Electricity lowest price today** | `sensor.essent_electricity_lowest_price_today` | ❌ | €/kWh | Lowest electricity price today with time window |
+| **Essent Dynamic Prices Electricity highest price today** | `sensor.essent_electricity_highest_price_today` | ❌ | €/kWh | Highest electricity price today with time window |
+| **Essent Dynamic Prices Gas current price** | `sensor.essent_gas_current_price` | ✅ | €/m³ | Current day's gas price |
+| **Essent Dynamic Prices Gas next price** | `sensor.essent_gas_next_price` | ✅ | €/m³ | Next day's gas price |
 
 ### Sensor Attributes
 
@@ -86,6 +86,28 @@ Prices are fetched from Essent's public API:
 
 - **Electricity:** Hourly prices, updates every hour. Tomorrow's prices available after 12:00 CET.
 - **Gas:** Daily prices, same price for entire day. Tomorrow's price available after 19:00 CET.
+
+## Data Updates
+
+The integration updates data in two ways:
+
+### API Data Fetching
+- **Frequency:** Once per hour at a random minute offset (0-59 minutes) - this offset is set once at setup and stays consistent
+- **Single API endpoint:** Fetches both electricity and gas prices from the same API call
+- **Tomorrow's data:** Automatically included in the response when available from Essent (typically after 12:00 CET for electricity, 19:00 CET for gas)
+- **Resilience:** If an API fetch fails, the coordinator automatically retries at the next scheduled hourly interval
+
+### Getting Help
+
+If you encounter issues not covered here:
+
+1. Check [existing GitHub issues](https://github.com/jaapp/ha-essent-dynamic/issues)
+2. Review Home Assistant logs for detailed error messages
+3. Open a [new issue](https://github.com/jaapp/ha-essent-dynamic/issues/new) with:
+   - Home Assistant version
+   - Integration version
+   - Detailed description of the problem
+   - Relevant log entries
 
 ## License
 
