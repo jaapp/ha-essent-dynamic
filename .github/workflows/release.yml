@@ -1,0 +1,75 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (without leading v)"
+        required: true
+
+permissions:
+  contents: write  # needed for pushes and release creation
+
+jobs:
+  cut-release:
+    name: Bump manifest, tag, and create draft release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare
+        id: prep
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
+          MANIFEST_FILE="custom_components/essent/manifest.json"
+
+          git checkout "${DEFAULT_BRANCH}"
+          git pull --ff-only origin "${DEFAULT_BRANCH}"
+
+          if [ -z "${VERSION}" ]; then
+            echo "Version input is required." >&2
+            exit 1
+          fi
+
+          if [[ "${VERSION}" == v* ]]; then
+            echo "Provide the version without the leading 'v' (got ${VERSION})." >&2
+            exit 1
+          fi
+
+          if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+            echo "Tag v${VERSION} already exists." >&2
+            exit 1
+          fi
+
+          jq --arg v "${VERSION}" '.version = $v' "${MANIFEST_FILE}" > "${MANIFEST_FILE}.tmp"
+          mv "${MANIFEST_FILE}.tmp" "${MANIFEST_FILE}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "default_branch=${DEFAULT_BRANCH}" >> "$GITHUB_OUTPUT"
+
+      - name: Commit manifest bump and tag
+        run: |
+          VERSION="${{ steps.prep.outputs.version }}"
+          DEFAULT_BRANCH="${{ steps.prep.outputs.default_branch }}"
+
+          git add custom_components/essent/manifest.json
+          git commit -m "chore: release v${VERSION}"
+          git tag "v${VERSION}"
+
+          git push origin HEAD:"refs/heads/${DEFAULT_BRANCH}"
+          git push origin "v${VERSION}"
+
+      - name: Create draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ steps.prep.outputs.version }}"
+          generate_release_notes: true
+          draft: true
