@@ -52,7 +52,6 @@ See [Energy Dashboard Guide](docs/ENERGY_DASHBOARD.md)
 | **Electricity Highest Price Today** | `sensor.essent_electricity_highest_price_today` | ❌ | €/kWh | Highest electricity price today with time window |
 | **Gas Current Price** | `sensor.essent_gas_current_price` | ✅ | €/m³ | Current day's gas price |
 | **Gas Next Price** | `sensor.essent_gas_next_price` | ✅ | €/m³ | Next day's gas price |
-| **Gas Price Today** | `sensor.essent_gas_average_today` | ✅ | €/m³ | Today's gas price |
 
 ### Sensor Attributes
 

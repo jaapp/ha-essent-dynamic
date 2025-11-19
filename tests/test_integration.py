@@ -52,7 +52,6 @@ async def test_full_integration_setup(
         assert hass.states.get("sensor.essent_electricity_average_today") is not None
         assert hass.states.get("sensor.essent_gas_current_price") is not None
         assert hass.states.get("sensor.essent_gas_next_price") is not None
-        assert hass.states.get("sensor.essent_gas_average_today") is not None
 
         # Verify sensor states
         elec_current = hass.states.get("sensor.essent_electricity_current_price")

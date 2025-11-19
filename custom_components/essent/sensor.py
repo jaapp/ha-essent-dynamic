@@ -57,8 +57,8 @@ async def async_setup_entry(
     for energy_type in [ENERGY_TYPE_ELECTRICITY, ENERGY_TYPE_GAS]:
         entities.append(EssentCurrentPriceSensor(coordinator, energy_type))
         entities.append(EssentNextPriceSensor(coordinator, energy_type))
-        entities.append(EssentAveragePriceSensor(coordinator, energy_type))
         if energy_type == ENERGY_TYPE_ELECTRICITY:
+            entities.append(EssentAveragePriceSensor(coordinator, energy_type))
             entities.append(EssentLowestPriceSensor(coordinator, energy_type))
             entities.append(EssentHighestPriceSensor(coordinator, energy_type))
 

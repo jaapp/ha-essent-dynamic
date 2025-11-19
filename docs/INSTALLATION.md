@@ -27,16 +27,13 @@ No configuration required! The integration uses Essent's public API.
 
 ## Verification
 
-After installation, you should see 6 enabled sensors:
+After installation, you should see 5 enabled sensors:
 - `sensor.essent_electricity_current_price`
 - `sensor.essent_electricity_next_price`
 - `sensor.essent_electricity_average_today`
 - `sensor.essent_gas_current_price`
 - `sensor.essent_gas_next_price`
-- `sensor.essent_gas_average_today`
 
-And 4 disabled sensors (can be enabled in entity settings):
+And 2 disabled sensors (can be enabled in entity settings):
 - `sensor.essent_electricity_lowest_price_today`
 - `sensor.essent_electricity_highest_price_today`
-- `sensor.essent_gas_lowest_price_today`
-- `sensor.essent_gas_highest_price_today`

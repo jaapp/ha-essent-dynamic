@@ -27,9 +27,6 @@
       "electricity_average_today": {
         "name": "Electricity average today"
       },
-      "gas_average_today": {
-        "name": "Gas average today"
-      },
       "electricity_lowest_price_today": {
         "name": "Electricity lowest price today"
       },
