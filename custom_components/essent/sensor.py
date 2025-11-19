@@ -88,7 +88,11 @@ class EssentCurrentPriceSensor(EssentEntity, SensorEntity):
     def native_value(self) -> float | None:
         """Return the current price."""
         now = dt_util.now()
-        tariffs = self.coordinator.data[self.energy_type]["tariffs"]
+        tariffs_today = self.coordinator.data[self.energy_type]["tariffs"]
+        tariffs_tomorrow = self.coordinator.data[self.energy_type].get(
+            "tariffs_tomorrow", []
+        )
+        tariffs: list[dict[str, Any]] = tariffs_today + tariffs_tomorrow
 
         for tariff in tariffs:
             start, end = _parse_tariff_times(tariff)
@@ -108,10 +112,14 @@ class EssentCurrentPriceSensor(EssentEntity, SensorEntity):
         """Return extra attributes."""
         now = dt_util.now()
         tariffs_today = self.coordinator.data[self.energy_type]["tariffs"]
+        tariffs_tomorrow = self.coordinator.data[self.energy_type].get(
+            "tariffs_tomorrow", []
+        )
+        tariffs: list[dict[str, Any]] = tariffs_today + tariffs_tomorrow
 
         # Find current tariff
         current_tariff = None
-        for tariff in tariffs_today:
+        for tariff in tariffs:
             start, end = _parse_tariff_times(tariff)
             if start and end and start <= now < end:
                 current_tariff = tariff

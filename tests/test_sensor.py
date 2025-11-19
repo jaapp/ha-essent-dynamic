@@ -84,6 +84,23 @@ async def test_next_price_sensor(
         assert sensor.native_value == 0.22
 
 
+async def test_current_price_sensor_uses_tomorrow(
+    hass: HomeAssistant, electricity_api_response: dict
+) -> None:
+    """Test current price sensor uses tomorrow's tariffs after midnight."""
+    coordinator = _coordinator_from_fixture(electricity_api_response)
+    sensor = EssentCurrentPriceSensor(coordinator, ENERGY_TYPE_ELECTRICITY)
+
+    with patch("custom_components.essent.sensor.dt_util.now") as mock_now:
+        # Simulate being after midnight on 2025-11-17
+        mock_now.return_value = dt_util.as_local(
+            datetime.fromisoformat("2025-11-17T00:30:00")
+        )
+
+        # Should use tomorrow's tariff (which is now today)
+        assert sensor.native_value == 0.21  # First tariff from tomorrow array
+
+
 async def test_next_price_sensor_uses_tomorrow(
     hass: HomeAssistant, electricity_api_response: dict
 ) -> None:
