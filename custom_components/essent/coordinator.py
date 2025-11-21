@@ -1,12 +1,20 @@
 """DataUpdateCoordinator for Essent integration."""
+
+from __future__ import annotations
+
+from collections.abc import Callable
 from datetime import datetime, timedelta
+from http import HTTPStatus
 import logging
 import random
-from typing import Any, Callable
+from typing import Any, TypedDict
 
-import aiohttp
+from aiohttp import ClientError, ClientTimeout
 
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import UnitOfEnergy, UnitOfVolume
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_track_point_in_utc_time
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
@@ -14,6 +22,22 @@ from homeassistant.util import dt as dt_util
 from .const import API_ENDPOINT, DOMAIN, UPDATE_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
+CLIENT_TIMEOUT = ClientTimeout(total=10)
+
+
+class EssentEnergyData(TypedDict):
+    """Data for a single Essent energy type."""
+
+    tariffs: list[dict[str, Any]]
+    tariffs_tomorrow: list[dict[str, Any]]
+    unit: str
+    min_price: float
+    avg_price: float
+    max_price: float
+
+
+type EssentData = dict[str, EssentEnergyData]
+type EssentConfigEntry = ConfigEntry["EssentDataUpdateCoordinator"]
 
 
 def _tariff_sort_key(tariff: dict[str, Any]) -> str:
@@ -21,14 +45,29 @@ def _tariff_sort_key(tariff: dict[str, Any]) -> str:
     return tariff.get("startDateTime", "")
 
 
-class EssentDataUpdateCoordinator(DataUpdateCoordinator):
+def _normalize_unit(unit: str) -> str:
+    """Normalize unit strings to HA's canonical constants."""
+    unit_normalized = unit.replace("³", "3").lower()
+    if unit_normalized == "kwh":
+        return UnitOfEnergy.KILO_WATT_HOUR
+    if unit_normalized in {"m3", "m^3"}:
+        return UnitOfVolume.CUBIC_METERS
+    return unit
+
+
+class EssentDataUpdateCoordinator(DataUpdateCoordinator[EssentData]):
     """Class to manage fetching Essent data."""
 
-    def __init__(self, hass: HomeAssistant) -> None:
+    config_entry: EssentConfigEntry | None
+
+    def __init__(
+        self, hass: HomeAssistant, config_entry: EssentConfigEntry | None = None
+    ) -> None:
         """Initialize."""
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=config_entry,
             name=DOMAIN,
             update_interval=None,  # explicit scheduling
         )
@@ -37,12 +76,34 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
         # Random minute offset for API fetches (0-59 minutes)
         self._api_fetch_minute_offset = random.randint(0, 59)
 
+    @property
+    def api_fetch_minute_offset(self) -> int:
+        """Return the configured minute offset for API fetches."""
+        return self._api_fetch_minute_offset
+
+    @property
+    def api_refresh_scheduled(self) -> bool:
+        """Return whether the API refresh task is scheduled."""
+        return self._unsub_data is not None
+
+    @property
+    def listener_tick_scheduled(self) -> bool:
+        """Return whether the listener tick task is scheduled."""
+        return self._unsub_listener is not None
+
     def start_schedules(self) -> None:
         """Start both API fetch and listener tick schedules.
 
         This should be called after the first successful data fetch.
         Schedules will continue running regardless of API success/failure.
         """
+        if self.config_entry and self.config_entry.pref_disable_polling:
+            _LOGGER.debug("Polling disabled by config entry, not starting schedules")
+            return
+
+        if self._unsub_data or self._unsub_listener:
+            return
+
         _LOGGER.info(
             "Starting schedules: API fetch every hour at minute %d, "
             "listener updates on the hour",
@@ -68,11 +129,11 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
 
         now = dt_util.utcnow()
         current_hour = now.replace(minute=0, second=0, microsecond=0)
-        candidate = current_hour + timedelta(
-            hours=1, minutes=self._api_fetch_minute_offset
+        candidate = current_hour + UPDATE_INTERVAL + timedelta(
+            minutes=self._api_fetch_minute_offset
         )
         if candidate <= now:
-            candidate = candidate + timedelta(hours=1)
+            candidate = candidate + UPDATE_INTERVAL
 
         _LOGGER.debug(
             "Scheduling next API fetch for %s (offset: %d minutes)",
@@ -96,7 +157,7 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
             self._unsub_listener()
 
         now = dt_util.utcnow()
-        next_hour = now + timedelta(hours=1)
+        next_hour = now + UPDATE_INTERVAL
         next_run = datetime(
             next_hour.year,
             next_hour.month,
@@ -126,7 +187,7 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
         data: dict[str, Any],
         energy_type: str,
         tomorrow: dict[str, Any] | None,
-    ) -> dict[str, Any]:
+    ) -> EssentEnergyData:
         """Normalize the energy block into the coordinator format."""
         tariffs_today = sorted(
             data.get("tariffs", []),
@@ -142,12 +203,12 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
                 tomorrow.get("tariffs", []),
                 key=_tariff_sort_key,
             )
-        unit = data.get("unitOfMeasurement") or data.get("unit")
+        unit = (data.get("unitOfMeasurement") or data.get("unit") or "").strip()
 
         amounts = [
-            tariff["totalAmount"]
+            float(total)
             for tariff in tariffs_today
-            if "totalAmount" in tariff
+            if (total := tariff.get("totalAmount")) is not None
         ]
         if not amounts:
             _LOGGER.debug(
@@ -164,86 +225,84 @@ class EssentDataUpdateCoordinator(DataUpdateCoordinator):
         return {
             "tariffs": tariffs_today,
             "tariffs_tomorrow": tariffs_tomorrow,
-            "unit": unit,
+            "unit": _normalize_unit(unit),
             "min_price": min(amounts),
             "avg_price": sum(amounts) / len(amounts),
             "max_price": max(amounts),
         }
 
-    async def _async_update_data(self) -> dict:
+    async def _async_update_data(self) -> EssentData:
         """Fetch data from API."""
+        session = async_get_clientsession(self.hass)
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    API_ENDPOINT,
-                    timeout=aiohttp.ClientTimeout(total=10),
-                    headers={"Accept": "application/json"},
-                ) as response:
-                    raw_body = await response.text()
-                    if response.status != 200:
-                        _LOGGER.debug(
-                            "Essent API %s returned %s with body: %s",
-                            API_ENDPOINT,
-                            response.status,
-                            raw_body,
-                        )
-                        raise UpdateFailed(f"Error fetching data: {response.status}")
-
-                    try:
-                        data = await response.json()
-                    except Exception as err:
-                        _LOGGER.debug("Failed to decode JSON body: %s", raw_body)
-                        raise UpdateFailed(f"Invalid JSON received: {err}") from err
-
-            prices = data.get("prices") or []
-            if not prices:
-                _LOGGER.debug("No price data available in response: %s", data)
-                raise UpdateFailed("No price data available")
-
-            current_date = dt_util.now().date().isoformat()
-            today = None
-            tomorrow = None
-
-            for idx, price in enumerate(prices):
-                if price.get("date") == current_date:
-                    today = price
-                    if idx + 1 < len(prices):
-                        tomorrow = prices[idx + 1]
-                    break
-
-            if today is None:
-                today = prices[0]
-                tomorrow = prices[1] if len(prices) > 1 else None
-                _LOGGER.debug(
-                    "No price entry found for %s, falling back to first date %s",
-                    current_date,
-                    today.get("date"),
-                )
-
-            electricity_block = today.get("electricity")
-            gas_block = today.get("gas")
-
-            if not electricity_block or not gas_block:
-                _LOGGER.debug(
-                    "Missing electricity or gas block in payload: %s", today
-                )
-                raise UpdateFailed("Response missing electricity or gas data")
-
-            result = {
-                "electricity": self._normalize_energy_block(
-                    electricity_block,
-                    "electricity",
-                    tomorrow.get("electricity") if tomorrow else None,
-                ),
-                "gas": self._normalize_energy_block(
-                    gas_block,
-                    "gas",
-                    tomorrow.get("gas") if tomorrow else None,
-                ),
-            }
-
-            return result
-        except aiohttp.ClientError as err:
+            response = await session.get(
+                API_ENDPOINT,
+                timeout=CLIENT_TIMEOUT,
+                headers={"Accept": "application/json"},
+            )
+        except ClientError as err:
             raise UpdateFailed(f"Error communicating with API: {err}") from err
-        except KeyError as err:
-            raise UpdateFailed(f"Invalid data received from API: {err}") from err
+
+        raw_body = await response.text()
+        if response.status != HTTPStatus.OK:
+            _LOGGER.debug(
+                "Essent API %s returned %s with body: %s",
+                API_ENDPOINT,
+                response.status,
+                raw_body,
+            )
+            raise UpdateFailed(f"Error fetching data: {response.status}")
+
+        try:
+            data = await response.json()
+        except ValueError as err:
+            _LOGGER.debug("Failed to decode JSON body: %s", raw_body)
+            raise UpdateFailed(f"Invalid JSON received: {err}") from err
+
+        prices = data.get("prices") or []
+        if not prices:
+            _LOGGER.debug("No price data available in response: %s", data)
+            raise UpdateFailed("No price data available")
+
+        current_date = dt_util.now().date().isoformat()
+        today: dict[str, Any] | None = None
+        tomorrow: dict[str, Any] | None = None
+
+        for idx, price in enumerate(prices):
+            if price.get("date") == current_date:
+                today = price
+                if idx + 1 < len(prices):
+                    tomorrow = prices[idx + 1]
+                break
+
+        if today is None:
+            today = prices[0]
+            tomorrow = prices[1] if len(prices) > 1 else None
+            _LOGGER.debug(
+                "No price entry found for %s, falling back to first date %s",
+                current_date,
+                today.get("date"),
+            )
+
+        if not isinstance(today, dict):
+            raise UpdateFailed("Invalid data structure for current prices")
+
+        electricity_block = today.get("electricity")
+        gas_block = today.get("gas")
+
+        if not isinstance(electricity_block, dict) or not isinstance(gas_block, dict):
+            _LOGGER.debug("Missing electricity or gas block in payload: %s", today)
+            raise UpdateFailed("Response missing electricity or gas data")
+
+        return {
+            "electricity": self._normalize_energy_block(
+                electricity_block,
+                "electricity",
+                tomorrow.get("electricity") if isinstance(tomorrow, dict) else None,
+            ),
+            "gas": self._normalize_energy_block(
+                gas_block,
+                "gas",
+                tomorrow.get("gas") if isinstance(tomorrow, dict) else None,
+            ),
+        }

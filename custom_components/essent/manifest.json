@@ -1,13 +1,15 @@
 {
   "domain": "essent",
-  "name": "Essent Dynamic Prices",
+  "name": "Essent",
   "codeowners": [
     "@jaapp"
   ],
   "config_flow": true,
-  "documentation": "https://github.com/jaapp/ha-essent-dynamic",
+  "documentation": "https://www.home-assistant.io/integrations/essent",
+  "integration_type": "service",
   "iot_class": "cloud_polling",
+  "quality_scale": "bronze",
   "requirements": [],
-  "version": "1.0.1",
-  "quality_scale": "bronze"
+  "single_config_entry": true,
+  "version": "1.0.2"
 }

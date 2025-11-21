@@ -1,21 +1,20 @@
 """Sensor platform for Essent integration."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CURRENCY_EURO
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, ENERGY_TYPE_ELECTRICITY, ENERGY_TYPE_GAS
-from .coordinator import EssentDataUpdateCoordinator
+from .const import ENERGY_TYPE_ELECTRICITY, ENERGY_TYPE_GAS
+from .coordinator import EssentConfigEntry, EssentDataUpdateCoordinator
 from .entity import EssentEntity
 
 PARALLEL_UPDATES = 1
@@ -48,7 +47,7 @@ def _format_dt_str(value: str | None) -> str | None:
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: EssentConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Essent sensors."""
@@ -71,7 +70,7 @@ class EssentCurrentPriceSensor(EssentEntity, SensorEntity):
     """Current price sensor."""
 
     _attr_device_class = SensorDeviceClass.MONETARY
-    _attr_state_class = None  # Monetary sensors don't use state_class
+    _attr_state_class = None
     _attr_suggested_display_precision = 3
 
     def __init__(
@@ -89,16 +88,15 @@ class EssentCurrentPriceSensor(EssentEntity, SensorEntity):
     def native_value(self) -> float | None:
         """Return the current price."""
         now = dt_util.now()
-        tariffs_today = self.coordinator.data[self.energy_type]["tariffs"]
-        tariffs_tomorrow = self.coordinator.data[self.energy_type].get(
+        data = self.coordinator.data[self.energy_type]
+        tariffs: list[dict[str, Any]] = data["tariffs"] + data.get(
             "tariffs_tomorrow", []
         )
-        tariffs: list[dict[str, Any]] = tariffs_today + tariffs_tomorrow
 
         for tariff in tariffs:
             start, end = _parse_tariff_times(tariff)
             if start and end and start <= now < end:
-                return tariff["totalAmount"]
+                return tariff.get("totalAmount")
 
         return None
 
@@ -112,11 +110,10 @@ class EssentCurrentPriceSensor(EssentEntity, SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra attributes."""
         now = dt_util.now()
-        tariffs_today = self.coordinator.data[self.energy_type]["tariffs"]
-        tariffs_tomorrow = self.coordinator.data[self.energy_type].get(
+        data = self.coordinator.data[self.energy_type]
+        tariffs: list[dict[str, Any]] = data["tariffs"] + data.get(
             "tariffs_tomorrow", []
         )
-        tariffs: list[dict[str, Any]] = tariffs_today + tariffs_tomorrow
 
         # Find current tariff
         current_tariff = None
@@ -130,16 +127,22 @@ class EssentCurrentPriceSensor(EssentEntity, SensorEntity):
 
         # Current price breakdown
         if current_tariff:
-            groups = {g["type"]: g["amount"] for g in current_tariff["groups"]}
+            groups = {
+                group["type"]: group.get("amount")
+                for group in current_tariff.get("groups", [])
+                if "type" in group
+            }
             attributes.update(
                 {
-                    "price_ex_vat": current_tariff["totalAmountEx"],
-                    "vat": current_tariff["totalAmountVat"],
+                    "price_ex_vat": current_tariff.get("totalAmountEx"),
+                    "vat": current_tariff.get("totalAmountVat"),
                     "market_price": groups.get("MARKET_PRICE"),
                     "purchasing_fee": groups.get("PURCHASING_FEE"),
                     "tax": groups.get("TAX"),
-                    "start_time": _format_dt_str(current_tariff["startDateTime"]),
-                    "end_time": _format_dt_str(current_tariff["endDateTime"]),
+                    "start_time": _format_dt_str(
+                        current_tariff.get("startDateTime")
+                    ),
+                    "end_time": _format_dt_str(current_tariff.get("endDateTime")),
                 }
             )
 
@@ -150,7 +153,7 @@ class EssentNextPriceSensor(EssentEntity, SensorEntity):
     """Next price sensor."""
 
     _attr_device_class = SensorDeviceClass.MONETARY
-    _attr_state_class = None  # Monetary sensors don't use state_class
+    _attr_state_class = None
     _attr_suggested_display_precision = 3
 
     def __init__(
@@ -168,16 +171,15 @@ class EssentNextPriceSensor(EssentEntity, SensorEntity):
     def native_value(self) -> float | None:
         """Return the next price."""
         now = dt_util.now()
-        tariffs_today = self.coordinator.data[self.energy_type]["tariffs"]
-        tariffs_tomorrow = self.coordinator.data[self.energy_type].get(
+        data = self.coordinator.data[self.energy_type]
+        tariffs: list[dict[str, Any]] = data["tariffs"] + data.get(
             "tariffs_tomorrow", []
         )
-        tariffs: list[dict[str, Any]] = tariffs_today + tariffs_tomorrow
 
         for tariff in tariffs:
             start, _ = _parse_tariff_times(tariff)
             if start and start > now:
-                return tariff["totalAmount"]
+                return tariff.get("totalAmount")
 
         return None
 
@@ -191,11 +193,10 @@ class EssentNextPriceSensor(EssentEntity, SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra attributes."""
         now = dt_util.now()
-        tariffs_today = self.coordinator.data[self.energy_type]["tariffs"]
-        tariffs_tomorrow = self.coordinator.data[self.energy_type].get(
+        data = self.coordinator.data[self.energy_type]
+        tariffs: list[dict[str, Any]] = data["tariffs"] + data.get(
             "tariffs_tomorrow", []
         )
-        tariffs: list[dict[str, Any]] = tariffs_today + tariffs_tomorrow
 
         next_tariff = None
         for tariff in tariffs:
@@ -207,16 +208,20 @@ class EssentNextPriceSensor(EssentEntity, SensorEntity):
         if not next_tariff:
             return {}
 
-        groups = {g["type"]: g["amount"] for g in next_tariff["groups"]}
+        groups = {
+            group["type"]: group.get("amount")
+            for group in next_tariff.get("groups", [])
+            if "type" in group
+        }
 
         return {
-            "price_ex_vat": next_tariff["totalAmountEx"],
-            "vat": next_tariff["totalAmountVat"],
+            "price_ex_vat": next_tariff.get("totalAmountEx"),
+            "vat": next_tariff.get("totalAmountVat"),
             "market_price": groups.get("MARKET_PRICE"),
             "purchasing_fee": groups.get("PURCHASING_FEE"),
             "tax": groups.get("TAX"),
-            "start_time": _format_dt_str(next_tariff["startDateTime"]),
-            "end_time": _format_dt_str(next_tariff["endDateTime"]),
+            "start_time": _format_dt_str(next_tariff.get("startDateTime")),
+            "end_time": _format_dt_str(next_tariff.get("endDateTime")),
         }
 
 
@@ -224,7 +229,7 @@ class EssentAveragePriceSensor(EssentEntity, SensorEntity):
     """Average price today sensor."""
 
     _attr_device_class = SensorDeviceClass.MONETARY
-    _attr_state_class = None  # Monetary sensors don't use state_class
+    _attr_state_class = None
     _attr_suggested_display_precision = 3
 
     def __init__(
@@ -235,10 +240,7 @@ class EssentAveragePriceSensor(EssentEntity, SensorEntity):
         """Initialize the sensor."""
         super().__init__(coordinator, energy_type)
         self._attr_unique_id = f"essent_{energy_type}_average_today"
-        if energy_type == ENERGY_TYPE_GAS:
-            self._attr_name = "Gas price today"
-        else:
-            self._attr_name = f"{energy_type.capitalize()} average today"
+        self._attr_name = f"{energy_type.capitalize()} average today"
         self._attr_translation_key = f"{energy_type}_average_today"
 
     @property
@@ -265,7 +267,7 @@ class EssentLowestPriceSensor(EssentEntity, SensorEntity):
     """Lowest price today sensor."""
 
     _attr_device_class = SensorDeviceClass.MONETARY
-    _attr_state_class = None  # Monetary sensors don't use state_class
+    _attr_state_class = None
     _attr_entity_registry_enabled_default = False
     _attr_suggested_display_precision = 3
 
@@ -299,10 +301,10 @@ class EssentLowestPriceSensor(EssentEntity, SensorEntity):
 
         # Find tariff with minimum price
         for tariff in tariffs:
-            if tariff["totalAmount"] == min_price:
+            if tariff.get("totalAmount") == min_price:
                 return {
-                    "start": _format_dt_str(tariff["startDateTime"]),
-                    "end": _format_dt_str(tariff["endDateTime"]),
+                    "start": _format_dt_str(tariff.get("startDateTime")),
+                    "end": _format_dt_str(tariff.get("endDateTime")),
                 }
 
         return {}
@@ -312,7 +314,7 @@ class EssentHighestPriceSensor(EssentEntity, SensorEntity):
     """Highest price today sensor."""
 
     _attr_device_class = SensorDeviceClass.MONETARY
-    _attr_state_class = None  # Monetary sensors don't use state_class
+    _attr_state_class = None
     _attr_entity_registry_enabled_default = False
     _attr_suggested_display_precision = 3
 
@@ -346,10 +348,10 @@ class EssentHighestPriceSensor(EssentEntity, SensorEntity):
 
         # Find tariff with maximum price
         for tariff in tariffs:
-            if tariff["totalAmount"] == max_price:
+            if tariff.get("totalAmount") == max_price:
                 return {
-                    "start": _format_dt_str(tariff["startDateTime"]),
-                    "end": _format_dt_str(tariff["endDateTime"]),
+                    "start": _format_dt_str(tariff.get("startDateTime")),
+                    "end": _format_dt_str(tariff.get("endDateTime")),
                 }
 
         return {}

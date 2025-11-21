@@ -17,16 +17,19 @@ async def test_diagnostics(
 ) -> None:
     """Test diagnostics for config entry."""
     # Mock API response
-    with patch("aiohttp.ClientSession.get") as mock_get, patch(
-        "homeassistant.util.dt.now"
-    ) as mock_now:
+    with patch(
+        "custom_components.essent.coordinator.async_get_clientsession"
+    ) as mock_session, patch("homeassistant.util.dt.now") as mock_now:
         mock_now.return_value = dt_util.as_local(
             dt_util.parse_datetime("2025-11-16T12:00:00")
         )
         mock_response = AsyncMock()
         mock_response.status = 200
+        mock_response.text = AsyncMock(return_value="")
         mock_response.json = AsyncMock(return_value=essent_api_response)
-        mock_get.return_value.__aenter__.return_value = mock_response
+        session = AsyncMock()
+        session.get = AsyncMock(return_value=mock_response)
+        mock_session.return_value = session
 
         # Setup config entry
         entry = MockConfigEntry(

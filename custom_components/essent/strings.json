@@ -2,12 +2,12 @@
   "config": {
     "step": {
       "user": {
-        "title": "Essent Dynamic Prices",
         "description": "Set up Essent dynamic energy price monitoring for the Netherlands. For customers with dynamic pricing contracts only."
       }
     },
     "abort": {
-      "already_configured": "Essent Dynamic Prices integration is already configured"
+      "already_configured": "Essent integration is already configured",
+      "single_instance_allowed": "[%key:common::config_flow::abort::single_instance_allowed%]"
     }
   },
   "entity": {
@@ -30,14 +30,8 @@
       "electricity_lowest_price_today": {
         "name": "Electricity lowest price today"
       },
-      "gas_lowest_price_today": {
-        "name": "Gas lowest price today"
-      },
       "electricity_highest_price_today": {
         "name": "Electricity highest price today"
-      },
-      "gas_highest_price_today": {
-        "name": "Gas highest price today"
       }
     }
   }
