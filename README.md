@@ -1,5 +1,16 @@
 <img width="2560" height="564" alt="afbeelding" src="https://github.com/user-attachments/assets/a33b7c89-e685-4eed-ab2a-b3712c57aeb1" />
 
+# ⚠️ ARCHIVED - This Repository is No Longer Maintained
+
+**This integration is now part of the official Home Assistant core repository.**
+
+For the most up-to-date version, documentation, and support, please refer to:
+- **Official Documentation:** [Home Assistant Essent Integration](https://www.home-assistant.io/integrations/essent/)
+- **Core Repository:** [home-assistant/core](https://github.com/home-assistant/core)
+- **Issue Reporting:** Use the official [Home Assistant issue tracker](https://github.com/home-assistant/core/issues)
+
+---
+
 # Essent Dynamic Prices - Home Assistant Integration
 
 Home Assistant integration for Essent dynamic energy contract prices in the Netherlands.
@@ -19,7 +30,23 @@ Home Assistant integration for Essent dynamic energy contract prices in the Neth
 
 ## Installation
 
-### Via HACS (Recommended)
+### Official Home Assistant Integration (Recommended)
+
+This integration is now built into Home Assistant. No custom installation required!
+
+1. Go to **Settings → Devices & Services**
+2. Click **Add Integration**
+3. Search for **Essent**
+4. Follow the setup instructions
+
+### Legacy Installation (This Archived Repository)
+
+⚠️ **Not recommended** - Use the official core integration instead.
+
+<details>
+<summary>Click to expand legacy installation instructions</summary>
+
+#### Via HACS
 
 1. Click this button:
 
@@ -31,9 +58,11 @@ Or manually:
 2. Add `https://github.com/jaapp/ha-essent-dynamic` as an *Integration*
 3. Install **Essent Dynamic Prices** and restart Home Assistant
 
-### Manual Installation
+#### Manual Installation
 
 See [Installation Guide](docs/INSTALLATION.md) for manual installation instructions.
+
+</details>
 
 ## Energy Dashboard Setup
 
@@ -97,17 +126,15 @@ The integration updates data in two ways:
 - **Tomorrow's data:** Automatically included in the response when available from Essent (typically after 12:00 CET for electricity, 19:00 CET for gas)
 - **Resilience:** If an API fetch fails, the coordinator automatically retries at the next scheduled hourly interval
 
-### Getting Help
+## Getting Help
 
-If you encounter issues not covered here:
+For the official core integration:
+- **Documentation:** [Home Assistant Essent Integration](https://www.home-assistant.io/integrations/essent/)
+- **Issues:** [Home Assistant Core Issues](https://github.com/home-assistant/core/issues)
+- **Community:** [Home Assistant Community Forum](https://community.home-assistant.io/)
 
-1. Check [existing GitHub issues](https://github.com/jaapp/ha-essent-dynamic/issues)
-2. Review Home Assistant logs for detailed error messages
-3. Open a [new issue](https://github.com/jaapp/ha-essent-dynamic/issues/new) with:
-   - Home Assistant version
-   - Integration version
-   - Detailed description of the problem
-   - Relevant log entries
+For this archived repository:
+- [Archived GitHub issues](https://github.com/jaapp/ha-essent-dynamic/issues) (read-only)
 
 ## License
 
